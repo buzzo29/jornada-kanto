@@ -152,18 +152,31 @@ console.log('\n=== O PÓDIO É DE PLACAR DISTINTO, E OS PRÊMIOS SÃO OS PEDIDOS
   ok('  e o pódio são os TRÊS placares distintos', JSON.stringify(res.podio) === '[900,700,500]', JSON.stringify(res.podio));
   const doces = async (u)=> ((await conta(u).get()).data() || {}).rareCandies || 0;
   const moedas = async (u)=> ((await conta(u).get()).data() || {}).moedas || 0;
-  ok('o 1º leva 2 doces', await doces('p1') === 2, String(await doces('p1')));
-  ok('  e o EMPATADO no topo leva os 2 também', await doces('p2') === 2, String(await doces('p2')));
-  ok('o 2º leva 1 doce', await doces('p3') === 1, String(await doces('p3')));
-  ok('o 3º leva 50 moedas', await moedas('p4') === 50, String(await moedas('p4')));
-  ok('  e nenhum doce', await doces('p4') === 0);
+  /* ⚠️ OS VALORES SAEM DA TABELA, nunca cravados: ela já mudou uma vez (27/09/2026, de
+     2 doces / 1 doce / 🪙 50 pra 1 doce / 🪙 75 / 🪙 30) e derrubou quatro arquivos de teste que
+     cravavam o número. O que a trava cobra é a REGRA: cada degrau paga o que a tabela diz, o
+     empatado no topo leva o MESMO do 1º, e o pagamento DESCE degrau a degrau. */
+  const PR = S.RANK_SEMANAL_PREMIOS;
+  const valor = (p) => (p.doces || 0) * 300 + (p.moedas || 0);    // o doce custa 🪙 300 na loja
+  ok('o 1º leva o prêmio do topo', await doces('p1') === PR[0].doces && await moedas('p1') === PR[0].moedas,
+     (await doces('p1')) + ' doce(s) + 🪙 ' + (await moedas('p1')));
+  ok('  e o EMPATADO no topo leva o MESMO', await doces('p2') === PR[0].doces && await moedas('p2') === PR[0].moedas,
+     (await doces('p2')) + ' doce(s) + 🪙 ' + (await moedas('p2')));
+  ok('o 2º leva o do segundo degrau', await doces('p3') === PR[1].doces && await moedas('p3') === PR[1].moedas,
+     (await doces('p3')) + ' doce(s) + 🪙 ' + (await moedas('p3')));
+  ok('o 3º leva o do terceiro', await doces('p4') === PR[2].doces && await moedas('p4') === PR[2].moedas,
+     (await doces('p4')) + ' doce(s) + 🪙 ' + (await moedas('p4')));
+  ok('  e o pagamento DESCE degrau a degrau', valor(PR[0]) > valor(PR[1]) && valor(PR[1]) > valor(PR[2]) && valor(PR[2]) > 0,
+     PR.map(valor).join(' > '));
   ok('o 4º não leva nada', await doces('p5') === 0 && await moedas('p5') === 0);
   /* ⚠️ A NOTIFICAÇÃO DIZ O QUE ELE GANHOU -- prêmio que o jogador não vê é o erro da
      especialidade de novo (ela valia 1%, não tinha selo, e a conclusão foi "não mudou nada"). */
   const n = await db.collection('users').doc('p1').collection('notifications').get();
   const txt = n.docs.map(d => (d.data().title || '') + ' ' + (d.data().body || '')).join(' | ');
   ok('a notificação nomeia a posição', /líder da semana/.test(txt), txt.slice(0, 80));
-  ok('  e o que ele ganhou', /Doces Raros/.test(txt));
+  /* ⚠️ SINGULAR AGORA (1 doce): a frase é montada do número, então cravar "Doces Raros" era
+     exatamente o que quebrou quando a tabela mudou. */
+  ok('  e o que ele ganhou', /Doce Raro/.test(txt), txt.slice(txt.indexOf('Ganhou'), txt.indexOf('Ganhou') + 30));
   ok('  e que a posição foi DIVIDIDA', /dividiu essa posição/.test(txt));
 }
 
@@ -191,8 +204,9 @@ console.log('\n=== A TRAVA DE "JÁ PAGO" É POR RANKING, e a Corrida tem DOIS ==
   const d1 = ((await conta('q1').get()).data() || {}).rareCandies || 0;
   await S.fecharSemanaDoRanking('raceRanking', sem, 'relay', false, 'Corrida em revezamento');
   const d2 = ((await conta('q1').get()).data() || {}).rareCandies || 0;
-  ok('o individual pagou 2', d1 === 2, String(d1));
-  ok('  e o revezamento pagou MAIS 2 (são dois rankings)', d2 === 4, String(d2));
+  const umDoce = S.RANK_SEMANAL_PREMIOS[0].doces;
+  ok('o individual pagou o prêmio do topo', d1 === umDoce, String(d1));
+  ok('  e o revezamento pagou DE NOVO (são dois rankings)', d2 === 2 * umDoce, String(d2));
   const ch = Object.keys(((await conta('q1').get()).data() || {}).premiosSemanais || {});
   ok('  com DUAS chaves distintas', ch.length === 2, JSON.stringify(ch));
 }
@@ -219,7 +233,8 @@ console.log('\n=== O CRON FECHA A ANTERIOR, NUNCA A CORRENTE ===');
   /* ⚠️ ISTO É O PONTO: fechando a corrente, o prêmio sairia no meio da semana e ela continuaria
      aceitando pontuação depois de paga -- quem jogasse na quarta correria por nada. */
   ok('a CORRENTE não fechou', !dCor.awarded_pontos, JSON.stringify(dCor));
-  ok('  e o Z1 ganhou os 2 doces', (((await conta('z1').get()).data() || {}).rareCandies || 0) === 2);
+  ok('  e o Z1 ganhou o prêmio do topo',
+     (((await conta('z1').get()).data() || {}).rareCandies || 0) === S.RANK_SEMANAL_PREMIOS[0].doces);
   /* e ele varre mais de uma semana pra trás, pra uma que ficou pra fora se recuperar sozinha */
   ok('ele varre ' + S.RANK_SEMANAS_A_FECHAR + ' semanas pra trás', S.RANK_SEMANAS_A_FECHAR >= 2);
 }
@@ -278,9 +293,34 @@ console.log('\n=== O SERVIDOR: as listas e as portas (lendo o código) ===');
   ok('  e só quem mede CONTADOR declara `unidade`',
      S.RANKS_SEMANAIS.filter(x => x.unidade).every(x => x.base === 'arenaRanking'),
      S.RANKS_SEMANAIS.filter(x => x.unidade).map(x => x.base).join(',') || '(nenhum)');
-  ok('os prêmios são 2 doces / 1 doce / 50 moedas',
-     JSON.stringify(S.RANK_SEMANAL_PREMIOS.map(p => p.doces + ':' + p.moedas)) === '["2:0","1:0","0:50"]',
+  /* ⚠️ ESTA CONTINUA CRAVADA, de propósito: ela é a única que prova que o PEDIDO de 27/09/2026
+     ("1 rare candy, 75 moedas, 30 moedas") foi feito. As outras derivam dela. */
+  ok('os prêmios são 1 doce / 🪙 75 / 🪙 30',
+     JSON.stringify(S.RANK_SEMANAL_PREMIOS.map(p => p.doces + ':' + p.moedas)) === '["1:0","0:75","0:30"]',
      JSON.stringify(S.RANK_SEMANAL_PREMIOS.map(p => p.doces + ':' + p.moedas)));
+  /* ⚠️ E A CÓPIA DA TELA TEM QUE BATER COM ELA -- o molde do `MOEDA_MODO_DIFICIL`: quem paga é o
+     servidor, e o cliente precisa dos números pra a nota da aba e pro pódio não mentirem. */
+  {
+    const m = HTML.match(/const RANK_PREMIOS_TELA = \[([\s\S]{0,240}?)\];/);
+    const naTela = m ? (m[1].match(/doces:\s*(\d+),\s*moedas:\s*(\d+)/g) || [])
+      .map(s => s.match(/doces:\s*(\d+),\s*moedas:\s*(\d+)/).slice(1,3).join(':')) : null;
+    ok('  e a cópia da TELA é a mesma tabela',
+       !!naTela && JSON.stringify(naTela) === JSON.stringify(S.RANK_SEMANAL_PREMIOS.map(p => p.doces + ':' + p.moedas)),
+       naTela ? JSON.stringify(naTela) : '(não achei o RANK_PREMIOS_TELA no index.html)');
+    /* ⚠️ E A NOTA É MONTADA DELA, nunca escrita: a frase antiga ("ganhe Doces Raros") prometia doce
+       pros três degraus e sobreviveu à mudança da tabela -- é a família de texto que mente. */
+    /* ⚠️ A FATIA É A FUNÇÃO, nunca o arquivo inteiro: a primeira versão desta trava procurava a
+       frase velha no HTML todo e acusava O PRÓPRIO COMENTÁRIO que explica por que ela saiu -- a
+       família que o CLAUDE.md registra ("citar nome de líder num comentário faz um teste que
+       procura nome de líder acusar o comentário"). */
+    const iN = HTML.indexOf('function notaDoPremioSemanal(');
+    const corpoNota = iN > 0 ? HTML.slice(iN, HTML.indexOf('\n}', iN)) : '';
+    ok('  (a fatia da nota tem o que ler)', corpoNota.length > 200, String(corpoNota.length));
+    ok('  e a nota da aba é montada da tabela (nenhum prêmio escrito à mão)',
+       /premiosSemanaisHtml\(\)/.test(corpoNota)
+       && !/Doce|🪙|\d\s*moeda/.test(corpoNota),
+       /Doce|🪙/.test(corpoNota) ? 'tem prêmio escrito na frase' : '');
+  }
   /* ⚠️ O CRON CHAMA AS DUAS, E A CÓPIA VEM ANTES: os casos chamam as funções na mão e passariam
      com a chamada órfã -- a mesma trava que o `applySpecialtyBuff` e o `equiparItens` já têm. */
   const iCopia = SRV.indexOf('await copiarGeralParaASemana()');
@@ -345,7 +385,7 @@ console.log('\n=== A TELA: as duas abas ===');
   ok('só UMA está acesa', (h.match(/tower-rank-aba on"/g) || []).length === 1);
   ok('a padrão é a DA SEMANA', /tower-rank-aba on"[^>]*>Da semana</.test(h));
   ok('  e ela mostra a lista da SEMANA', JSON.stringify(nomes(h)) === '["CIDA"]', JSON.stringify(nomes(h)));
-  ok('  com a nota do prêmio', /Lidere até o fim da semana e ganhe Doces Raros/.test(h));
+  ok('  com a nota do prêmio', /Lidere a semana:/.test(h) && /Doce Raro/.test(h) && /🪙 75/.test(h));
   /* ⚠️ A DATA É O PRAZO (o DOMINGO), não a abertura: o que decide se vale jogar hoje é quanto
      tempo ainda há. O `semanaId` é a segunda (21/09), então a nota tem que dizer 27/09.
      ⚠️ E ELA É DERIVADA do `trainersLeagueDateStrPlusDays` -- a MESMA regra de data que o cron
@@ -417,6 +457,164 @@ console.log('\n=== A TELA: as duas abas ===');
   S2.rankTrocarAba('pescaria', 'semana');
   const hn = S2.pescariaRankHtml();
   ok('sem a lista da semana ele cai no de sempre', JSON.stringify(nomes(hn)) === '["ANA"]', JSON.stringify(nomes(hn)));
+}
+
+console.log('\n=== O PÓDIO DA SEMANA QUE FECHOU: o resumo no servidor (27/09/2026) ===');
+{
+  /* ⚠️ O `podium_` sozinho é uma lista de PLACARES -- um popup que diz "900, 700, 500" sem dizer
+     QUEM não anuncia nada. O resumo é o que carrega os NOMES, e ele é escrito na MESMA gravação do
+     pódio (antes de pagar e antes do `awarded`): escrito depois, uma semana que estourasse no meio
+     do laço ficaria sem resumo pra sempre. */
+  const sem = '2026-07-06';
+  for(const [u, p] of [['r1', 900], ['r2', 900], ['r3', 700], ['r4', 500], ['r5', 100]]){
+    await conta(u).set({ trainerName: u.toUpperCase() });
+    await semana('fishingRanking', sem, u).set({ uid: u, nome: u.toUpperCase(), pontos: p, semanaId: sem });
+  }
+  await S.fecharSemanaDoRanking('fishingRanking', sem, 'pontos', true, 'Pescaria');
+  const d = (await S.rankSemanaDocRef('fishingRanking', sem).get()).data() || {};
+  const res = d.resumo_pontos;
+  ok('o fechamento grava o resumo com NOMES', Array.isArray(res) && res.length === 3,
+     JSON.stringify(res));
+  ok('  e o degrau DIVIDIDO traz os dois nomes',
+     JSON.stringify(res[0].nomes) === '["R1","R2"]' && res[0].total === 2 && res[0].valor === 900,
+     JSON.stringify(res[0]));
+  ok('  e os nomes vêm ORDENADOS (o corte é o mesmo em toda leitura)',
+     JSON.stringify(res[0].nomes) === JSON.stringify(res[0].nomes.slice().sort()));
+  ok('  e os degraus 2 e 3 são os placares seguintes',
+     res[1].valor === 700 && res[2].valor === 500 && res[1].pos === 2 && res[2].pos === 3,
+     res.map(x => x.pos + ':' + x.valor).join(' '));
+  ok('  e o 4º (100 pts) NÃO entra', JSON.stringify(res).indexOf('R5') < 0);
+  /* ⚠️ E ELE VEM ANTES DO `awarded` no código -- a mesma ordem que protege o pagamento. */
+  /* ⚠️ A FATIA COMEÇA NO CÁLCULO DO PÓDIO, e não no início da função: o ramo da semana VAZIA marca
+     o `awarded` ali mesmo (não há o que pagar), então medir desde o topo compara com a marca
+     ERRADA e a trava dá falso negativo. É a mesma fatia que a trava irmã (a do awarded) usa. */
+  const corpoF = SRV.slice(SRV.indexOf('async function fecharSemanaDoRanking('));
+  const fatiaF0 = corpoF.slice(0, corpoF.indexOf('async function premiarSemana('));
+  const fatiaF = fatiaF0.slice(fatiaF0.indexOf('const valores = '));
+  ok('  (a fatia do pódio tem o que ler)', fatiaF.length > 200 && fatiaF.indexOf('[marca]: true') > 0,
+     String(fatiaF.length));
+  ok('  e o resumo é gravado ANTES da marca awarded',
+     fatiaF.indexOf("'resumo_'") > 0 && fatiaF.indexOf("'resumo_'") < fatiaF.indexOf('[marca]: true'),
+     fatiaF.indexOf("'resumo_'") + ' < ' + fatiaF.indexOf('[marca]: true'));
+}
+
+console.log('\n=== E A CALLABLE QUE O POPUP LÊ ===');
+{
+  const anterior = S.semanaDoRanking(Date.now() - 7 * DIA);
+  await conta('pod1').set({ trainerName: 'POD1' });
+  await semana('rescueRanking', anterior, 'pod1').set({ uid:'pod1', nome:'POD1', pontos: 300, semanaId: anterior });
+  await semana('arenaRanking', anterior, 'pod1').set({ uid:'pod1', nome:'POD1', nivel: 12, semanaId: anterior });
+  /* ⚠️ O PAINEL PRECISA DESMARCAR A SEMANA: o bloco do cron, lá em cima, já rodou o
+     `fecharSemanasPendentes` -- sem isto os pódios novos nascem numa semana que já está fechada e
+     o `fecharSemanaDoRanking` vai embora na porta. Medir isso era medir o conjunto vazio. */
+  for(const b of ['fishingRanking','rescueRanking','raceRanking','arenaRanking']){
+    await S.rankSemanaDocRef(b, anterior).set(
+      { awarded_pontos:false, awarded_single:false, awarded_relay:false, awarded_nivel:false }, { merge:true });
+  }
+
+  /* ⚠️ ANTES DE O CRON FECHAR ela não anuncia nada: a semana vira à meia-noite de segunda e o cron
+     passa de hora em hora -- anunciar ali seria anunciar um pódio antes de pagar. */
+  const cru = await chamar(fns.getIslandsWeeklyPodium, 'pod1', {});
+  ok('sem o fechamento ela NÃO anuncia', cru && cru.pronto === false, JSON.stringify(cru));
+
+  await S.fecharSemanasPendentes();
+  const r = await chamar(fns.getIslandsWeeklyPodium, 'pod1', {});
+  ok('depois do fechamento ela traz os pódios', !!r && r.pronto === true && r.podios.length >= 2,
+     r ? (r.semanaId + ': ' + r.podios.map(p => p.rotulo).join(', ')) : '');
+  ok('  e a semana é a ANTERIOR, nunca a corrente', r.semanaId === anterior,
+     r.semanaId + ' x corrente ' + S.semanaDoRanking());
+  const arena = r.podios.find(p => p.rotulo === 'Arena 1x1');
+  ok('  e a Arena declara a UNIDADE (nível, não pontos)', !!arena && arena.unidade === 'nivel',
+     arena ? String(arena.unidade) : '(sem Arena)');
+  ok('  e o degrau traz nome e valor',
+     !!arena && arena.degraus[0].nomes[0] === 'POD1' && arena.degraus[0].valor === 12,
+     arena ? JSON.stringify(arena.degraus[0]) : '');
+  ok('  e ela manda a tabela de prêmios junto',
+     JSON.stringify(r.premios) === JSON.stringify(S.RANK_SEMANAL_PREMIOS));
+
+  /* ⚠️ A SAÍDA CURTA: quem já viu custa UMA leitura, e essa é a maioria esmagadora das chamadas --
+     a tela das Ilhas abre várias vezes por visita e o popup é uma vez por semana. */
+  await conta('pod1').set({ ilhasResumoVisto: anterior }, { merge: true });
+  const v = await chamar(fns.getIslandsWeeklyPodium, 'pod1', {});
+  ok('quem JÁ VIU recebe a saída curta', !!v && v.visto === true && !v.podios, JSON.stringify(v));
+  /* e a marca é do SEMANA, não um booleano: a semana seguinte volta a anunciar */
+  await conta('pod1').set({ ilhasResumoVisto: '1999-01-04' }, { merge: true });
+  const v2 = await chamar(fns.getIslandsWeeklyPodium, 'pod1', {});
+  ok('  e com a marca de OUTRA semana ela anuncia de novo', !!v2 && v2.pronto === true);
+}
+
+console.log('\n=== E O POPUP NA TELA DAS ILHAS ===');
+{
+  const { createSandbox } = require('./game-sandbox');
+  const S3 = createSandbox();
+  S3.game.authUser = null;                       // sem login ele nem pergunta
+  S3.game.screen = 'ilhas';
+  S3.game.ilhasResumo = { semanaId: '2026-09-21', pronto: true,
+    premios: S.RANK_SEMANAL_PREMIOS,
+    podios: [
+      { rotulo:'Pescaria', unidade:null, maior:true,  degraus:[
+        { pos:1, valor:900, total:2, nomes:['ANA','BIA'] }, { pos:2, valor:700, total:1, nomes:['CIDA'] }] },
+      { rotulo:'Corrida individual', unidade:null, maior:false, degraus:[
+        { pos:1, valor:18.5, total:1, nomes:['DUDA'] }] },
+      { rotulo:'Arena 1x1', unidade:'nivel', maior:true, degraus:[
+        { pos:1, valor:12, total:7, nomes:['E1','E2','E3','E4','E5'] }] }
+    ] };
+  const h = S3.renderIlhasResumoModal();
+  ok('o popup nomeia os três modos',
+     h.indexOf('Pescaria') > 0 && h.indexOf('Corrida individual') > 0 && h.indexOf('Arena 1x1') > 0);
+  ok('  e traz os nomes do degrau dividido', h.indexOf('ANA, BIA') > 0);
+  /* ⚠️ A UNIDADE VEM DO SERVIDOR: pontos, TEMPO (menor é melhor) e NÍVEL são três coisas, e uma
+     regra própria aqui diria "com 12 pontos" onde o certo é "nível 12". */
+  ok('  e a unidade de cada modo está certa',
+     h.indexOf('900 pts') > 0 && h.indexOf('18,50s') > 0 && h.indexOf('nível 12') > 0,
+     [/900 pts/.test(h), /18,50s/.test(h), /nível 12/.test(h)].join(','));
+  /* ⚠️ E O "+N" EXISTE: o pódio é de PLACAR distinto, então um degrau pode ter dez empatados --
+     cortar a lista sem dizer quantos sobraram esconderia gente que GANHOU o prêmio. */
+  ok('  e o degrau com mais gente que o teto diz "+N"', h.indexOf('+2') > 0);
+  ok('  e a data do período aparece', h.indexOf('21/09') > 0 && h.indexOf('27/09') > 0);
+  ok('  e os prêmios saem da tabela que veio do servidor',
+     h.indexOf('Doce Raro') > 0 && h.indexOf('🪙 75') > 0 && h.indexOf('🪙 30') > 0);
+
+  /* ⚠️ FECHAR É O QUE MARCA, e a marca é o semanaId. */
+  S3.fecharResumoDasIlhas();
+  ok('fechar marca a semana e some com o popup',
+     S3.game.ilhasResumoVisto === '2026-09-21' && !S3.game.ilhasResumo
+     && S3.renderIlhasResumoModal() === '',
+     String(S3.game.ilhasResumoVisto));
+
+  /* ⚠️ E O MODAL VEM POR ÚLTIMO no renderIlhas: os modais empilham na ordem em que entram, e este
+     é o que BLOQUEIA -- vindo antes, o (i) de uma ilha abriria por cima dele. */
+  const iR = HTML.indexOf('function renderIlhas(');
+  const corpoI = HTML.slice(iR, HTML.indexOf('\n}', iR));
+  ok('  (a fatia do renderIlhas tem o que ler)', corpoI.length > 300, String(corpoI.length));
+  ok('o modal do pódio vem DEPOIS do modal da ilha',
+     corpoI.indexOf('renderIlhasResumoModal()') > corpoI.indexOf('renderIlhaInfoModal()'),
+     corpoI.indexOf('renderIlhaInfoModal()') + ' < ' + corpoI.indexOf('renderIlhasResumoModal()'));
+
+  /* ⚠️ O `abrirIlhas` PERGUNTA, e os casos acima chamam a função na mão -- passariam com a chamada
+     órfã. É a mesma trava que o `applySpecialtyBuff` e o `repararEvolucoesAtrasadas` já têm. */
+  const iA = HTML.indexOf('function abrirIlhas(');
+  const corpoA = HTML.slice(iA, HTML.indexOf('\n}', iA));
+  ok('o abrirIlhas chama o conferirResumoDasIlhas', corpoA.indexOf('conferirResumoDasIlhas()') > 0);
+  /* ⚠️ E DEPOIS DO `render()`: a tela não pode esperar uma ida ao servidor pra aparecer. */
+  ok('  e DEPOIS do render()', corpoA.indexOf('conferirResumoDasIlhas()') > corpoA.indexOf('render();'));
+
+  /* ⚠️ O `render()` SÓ NA TELA DAS ILHAS: a resposta chega por promessa e o jogador pode estar
+     dentro de um minigame -- um render() ali mata a animação em curso, a regra da casa. */
+  const iC = HTML.indexOf('async function conferirResumoDasIlhas(');
+  const corpoC = HTML.slice(iC, HTML.indexOf('\n}', iC));
+  ok('  e o render() do conferir é guardado pela tela',
+     /if\(game\.screen === 'ilhas'\) render\(\)/.test(corpoC));
+  ok('  e ele pergunta UMA vez por sessão', corpoC.indexOf('game.ilhasResumoPedido') > 0);
+
+  /* ⚠️ OS TRÊS CAMPOS ESTÃO NO CAMPOS_DA_CONTA: sem eles o resetGame os apagaria ao abrir um save,
+     e o popup voltaria pra quem já fechou (mais uma ida ao servidor por save aberto). */
+  for(const c of ['ilhasResumoVisto','ilhasResumo','ilhasResumoPedido'])
+    ok('  ' + c + ' está no CAMPOS_DA_CONTA', S3.CAMPOS_DA_CONTA.indexOf(c) >= 0);
+  /* e a marca sobrevive ao resetGame, que é o que isso compra */
+  S3.game.ilhasResumoVisto = '2026-09-21';
+  S3.restauraDadosDaConta(S3.snapshotDaConta());
+  ok('  e a marca atravessa o snapshot da conta', S3.game.ilhasResumoVisto === '2026-09-21');
 }
 
 console.log('\n' + (falhas ? falhas + ' FALHA(S)' : 'tudo certo'));

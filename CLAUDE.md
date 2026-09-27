@@ -2708,7 +2708,7 @@ Treinadores**, o **Ginásio da Cidade**, o **montador de time**, o **painel de a
 **⚠️ E ESTES SÍMBOLOS SÓ SÃO EXPLICADOS LÁ** — um `grep` que caia aqui e não ache nada tem que
 ir pro capítulo, e é essa lista que faz o gatilho valer quando o assunto não é óbvio:
 
-`drawCycle` · `MAX_GOLPES` · `isAccountActiveInLeague` · `advanceCyclePhases` · `cycleId` · `ensureRegisteringCycle` · `typeId` · `proFaixa` · `dividirEmChaves` · `coinsPaid` · `computePlacement` · `resolverTimeDosSaves` · `claimJourneyCoins` · `DUPLICATE` · `leagueCycles` · `cycleDocRef` · `REGULAR_LIGA_SIZE` · `leagueTypeId` · `accountLeagueSlots` · `ReferenceError` · `recordLeagueChampionWin` · `CRIT_BASE` · `matchKey` · `watchLeagueMatch` · `registrantCount` · `adminListTrainers` · `startAfter` · `montadorDeTimeHtml` · `monId` · `leaderUid` · `setNeighborhoodGymDefense` · `resgatandoConquistas` · `serializeGame` · `towerGetToday`
+`drawCycle` · `MAX_GOLPES` · `isAccountActiveInLeague` · `advanceCyclePhases` · `cycleId` · `ensureRegisteringCycle` · `typeId` · `proFaixa` · `dividirEmChaves` · `coinsPaid` · `computePlacement` · `resolverTimeDosSaves` · `claimJourneyCoins` · `DUPLICATE` · `leagueCycles` · `cycleDocRef` · `REGULAR_LIGA_SIZE` · `leagueTypeId` · `accountLeagueSlots` · `ReferenceError` · `recordLeagueChampionWin` · `CRIT_BASE` · `matchKey` · `watchLeagueMatch` · `registrantCount` · `adminListTrainers` · `startAfter` · `montadorDeTimeHtml` · `monId` · `leaderUid` · `setNeighborhoodGymDefense` · `resgatandoConquistas` · `serializeGame` · `towerGetToday` · `trainersLeagueActiveDateId` · `trainersLeaguePrevDayDone` · `adminAddTrainersLeagueRegistration`
 
 *(16 seções, 98 subseções, 175 KB — saíram daqui em 25/09/2026 porque o CLAUDE.md é lido
 INTEIRO em toda sessão, e ele tinha chegado a 1.360 KB.)*
@@ -3693,7 +3693,7 @@ e a cena da **Arena da semana**.
 **⚠️ E ESTES SÍMBOLOS SÓ SÃO EXPLICADOS LÁ** — um `grep` que caia aqui e não ache nada tem que
 ir pro capítulo, e é essa lista que faz o gatilho valer quando o assunto não é óbvio:
 
-`equiparNpc` · `orderBy` · `applySavedState` · `firestore.rules` · `preservePlayerHp` · `simulateGymBattle` · `ilhasJornada` · `journeyEnd` · `CRIT_BASE` · `effectiveSpeed` · `speedDaCorrida` · `loadPermanentUserData` · `corridaZerar` · `index.html` · `abrirConfronto` · `arrayUnion` · `calcMaxHp` · `abrirCorrida` · `createInstance` · `ehDoJogador` · `npcParaOSpeed` · `nivelDoNpc` · `DESENHOS` · `game.screen` · `requestAnimationFrame` · `advanceReveal` · `pescariaTerminar` · `classList` · `slotDaConta` · `pescariaBatalhar` · `corridaInstancia` · `pescariaPintarArea` · `game.saveSlots` · `entradaAte`
+`equiparNpc` · `orderBy` · `applySavedState` · `firestore.rules` · `preservePlayerHp` · `simulateGymBattle` · `ilhasJornada` · `journeyEnd` · `CRIT_BASE` · `effectiveSpeed` · `speedDaCorrida` · `loadPermanentUserData` · `corridaZerar` · `index.html` · `abrirConfronto` · `arrayUnion` · `calcMaxHp` · `abrirCorrida` · `createInstance` · `ehDoJogador` · `npcParaOSpeed` · `nivelDoNpc` · `DESENHOS` · `game.screen` · `requestAnimationFrame` · `advanceReveal` · `pescariaTerminar` · `classList` · `slotDaConta` · `pescariaBatalhar` · `corridaInstancia` · `pescariaPintarArea` · `game.saveSlots` · `entradaAte` · `RANK_SEMANAL_PREMIOS` · `getIslandsWeeklyPodium` · `RANK_PREMIOS_TELA` · `conferirResumoDasIlhas`
 
 *(18 seções, 249 subseções, 360 KB — saíram daqui em 25/09/2026 porque o CLAUDE.md é lido
 INTEIRO em toda sessão, e ele tinha chegado a 1.360 KB.)*

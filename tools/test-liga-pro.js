@@ -592,6 +592,35 @@ console.log('\n=== O RANKING E O HISTÓRICO ===');
 /* ============================================================================
    10) PONTA A PONTA -- 8 inscritos entram no chaveamento, o forjado não
    ============================================================================ */
+
+console.log('\n=== PONTA A PONTA (o drawCycle de verdade) ===');
+{
+  /* ⚠️ ESTA É A TRAVA QUE PROVA A FEATURE INTEIRA: ela roda o `drawCycle` contra o Firestore em
+     memória, com 8 inscrições legítimas e UMA forjada. Todos os outros casos chamam a validação na
+     mão e passariam com a chamada órfã. */
+  const Module = require('module');
+  const fake = require('./fake-firestore.js');
+  const db = fake.makeDb();
+  const stubs = {
+    'firebase-functions/v2/scheduler': { onSchedule: (a, b) => (typeof a === 'function' ? a : b) },
+    'firebase-functions/v2/https': { onCall: (fn) => fn,
+      HttpsError: class HttpsError extends Error { constructor(c, m){ super(m); this.code = c; } } },
+    'firebase-functions/logger': { error(){}, info(){}, warn(){}, log(){} },
+    'firebase-admin': { initializeApp(){}, firestore: Object.assign(() => db, { FieldValue: fake.FieldValue }) }
+  };
+  const load = Module._load;
+  Module._load = function(req){ if(stubs[req]) return stubs[req]; return load.apply(this, arguments); };
+  delete require.cache[require.resolve(path.join(raiz, 'functions', 'index.js'))];
+  const F = require(path.join(raiz, 'functions', 'index.js'));
+  Module._load = load;
+
+  const T = F._PRO_LEAGUE_TYPE, N = F._PRO_ESCOLHE, CID = '1758600000000';
+  const cod = (t) => Buffer.from(t.map(p => p.speciesId + ':' + p.level + (p.shiny ? ':1' : '')).join(','))
+    .toString('base64').replace(/=+$/, '');
+  const cyc = () => db.collection('leagueCycles').doc(T + '__' + CID);
+  const sch = () => db.collection('leagues').doc('schedule_' + T);
+
+  (async () => {
 console.log('\n=== O PAINEL INSCREVE NA TRAINERS LEAGUE (27/09/2026) ===');
 {
   /* ⚠️ A CALLABLE DE ADMIN TEM QUE GRAVAR O MESMO QUE O JOGADOR GRAVA -- e a unica coisa que
@@ -617,7 +646,6 @@ console.log('\n=== O PAINEL INSCREVE NA TRAINERS LEAGUE (27/09/2026) ===');
   const F2 = require(path.join(raiz, 'functions', 'index.js'));
   Module2._load = load2;
 
-  (async () => {
     const uid = 'tre-tl';
     await db2.collection('users').doc(uid).set({ trainerName: 'Buzzo', admin: false, specialties: ['Water'] });
     await db2.collection('users').doc('chefe').set({ trainerName: 'Chefe', admin: true });
@@ -682,37 +710,71 @@ console.log('\n=== O PAINEL INSCREVE NA TRAINERS LEAGUE (27/09/2026) ===');
     try { await F2.adminAddTrainersLeagueRegistration({ auth:{ uid:'chefe' }, data:{ uid:'vazio' } }); } catch(e){ erro4 = e; }
     ok('  e conta sem time apto e recusada', !!erro4 && erro4.code === 'failed-precondition',
        erro4 ? erro4.code + ': ' + erro4.message.slice(0, 40) : '(passou!)');
-  })();
+
+    /* ============================================================================
+       ⚠️ AS DUAS METADES DO RELOGIO, COM O `Date.now` DUBLADO -- e esta e a trava que faltava.
+       A callable nasceu (27/09) com `trainersLeagueTodayDateStr()` FIXO, e as travas acima
+       passaram: elas rodaram as ~10h no fuso do jogo, e ANTES da trava das 11h o "hoje" fixo
+       CONCORDA com o dia ativo. Depois das 11h o jogo manda a inscricao pra AMANHA e a callable
+       passava a recusar tudo com "as inscricoes de hoje ja se encerraram" -- relatado as 20h24, no
+       mesmo dia em que subiu.
+       ⚠️ TRAVA PRESA AO RELOGIO DE PAREDE MEDE UM RAMO SO, e o outro so aparece em producao. As
+       datas abaixo sao fixas de proposito; o fuso do jogo e travado no `TRAINERS_LEAGUE_TZ_OFFSET`
+       e no `America/Sao_Paulo` do `Intl`, entao elas nao dependem do fuso desta maquina.
+       ============================================================================ */
+    const relogioReal = Date.now;
+    const spEm = (h, m) => Date.UTC(2026, 8, 27, h + 3, m || 0);   // 2026-09-27 h:mm em Sao Paulo
+    try{
+      const inscrever = async (uid) => {
+        await db2.collection('users').doc(uid).set({ trainerName: uid.toUpperCase() });
+        await db2.collection('users').doc(uid).collection('saves').doc('0')
+          .set({ team: time, badgeCount: 8, trainerName: uid.toUpperCase() });
+        try { return { r: await F2.adminAddTrainersLeagueRegistration({ auth:{ uid:'chefe' }, data:{ uid } }) }; }
+        catch(e){ return { e }; }
+      };
+
+      Date.now = () => spEm(8, 0);          // 08:00 -- dentro da janela de HOJE
+      const antes = await inscrever('tl-antes');
+      ok('  as 08h (antes da trava das 11h) ele inscreve pra HOJE',
+         !!antes.r && antes.r.dateId === '2026-09-27',
+         antes.r ? antes.r.dateId : (antes.e.code + ': ' + antes.e.message));
+
+      /* ⚠️ ESTE E O CASO DO RELATO: 20h24, depois da trava. Com o "hoje" fixo ele estoura. */
+      Date.now = () => spEm(20, 24);
+      const depois = await inscrever('tl-depois');
+      ok('  as 20h24 (depois da trava) ele inscreve pra AMANHA -- o caso relatado',
+         !!depois.r && depois.r.dateId === '2026-09-28',
+         depois.r ? depois.r.dateId : (depois.e.code + ': ' + depois.e.message));
+
+      /* ⚠️ E A GUARDA DO DIA ANTERIOR: enquanto a liga de hoje ainda ROLA, o jogo nao deixa entrar
+         no dia seguinte -- sem ela o painel criaria um inscrito que o jogador nao consegue criar. */
+      await db2.collection('trainersLeagueCycles').doc('2026-09-27').set({ status: 'active' }, { merge: true });
+      const rolando = await inscrever('tl-rolando');
+      ok('  e com a liga do dia AINDA RODANDO ele recusa',
+         !!rolando.e && rolando.e.code === 'failed-precondition'
+         && /liga do dia terminar/.test(rolando.e.message),
+         rolando.e ? rolando.e.message.slice(0, 50) : '(inscreveu!)');
+    } finally { Date.now = relogioReal; }
+
+    /* ⚠️ E AS DUAS COPIAS TEM QUE BATER: estas regras nasceram no index.html e o servidor precisou
+       delas quando o painel apareceu. Divergindo, o painel inscreve num dia e o jogo noutro -- e o
+       sintoma e MUDO, porque os dois gravam sem erro. O molde e o do `MOEDA_MODO_DIFICIL`. */
+    for(const fn of ['trainersLeagueActiveDateId', 'trainersLeaguePrevDayDone']){
+      const corpo = (txt) => {
+        const i = txt.indexOf('function ' + fn + '(');
+        if(i < 0) return null;
+        const j = txt.indexOf('\n}', i);
+        /* ⚠️ A UNICA diferenca tolerada e o logger: o cliente nao tem `logger` e o servidor nao usa
+           `console`. Normalizar mais que isto seria deixar passar divergencia de REGRA. */
+        return j < 0 ? null : txt.slice(i, j + 2).replace(/\/\/[^\n]*/g, '')
+          .replace(/\blogger\.error\b/g, 'console.error').replace(/\s+/g, ' ').trim();
+      };
+      const noCliente = corpo(src), noServidor = corpo(srvSrc);
+      ok('  o ' + fn + ' e IGUAL nos dois arquivos', !!noCliente && noCliente === noServidor,
+         !noCliente ? '(nao achei no index.html)' : (noCliente === noServidor ? '' : 'DIVERGEM'));
+    }
 }
 
-console.log('\n=== PONTA A PONTA (o drawCycle de verdade) ===');
-{
-  /* ⚠️ ESTA É A TRAVA QUE PROVA A FEATURE INTEIRA: ela roda o `drawCycle` contra o Firestore em
-     memória, com 8 inscrições legítimas e UMA forjada. Todos os outros casos chamam a validação na
-     mão e passariam com a chamada órfã. */
-  const Module = require('module');
-  const fake = require('./fake-firestore.js');
-  const db = fake.makeDb();
-  const stubs = {
-    'firebase-functions/v2/scheduler': { onSchedule: (a, b) => (typeof a === 'function' ? a : b) },
-    'firebase-functions/v2/https': { onCall: (fn) => fn,
-      HttpsError: class HttpsError extends Error { constructor(c, m){ super(m); this.code = c; } } },
-    'firebase-functions/logger': { error(){}, info(){}, warn(){}, log(){} },
-    'firebase-admin': { initializeApp(){}, firestore: Object.assign(() => db, { FieldValue: fake.FieldValue }) }
-  };
-  const load = Module._load;
-  Module._load = function(req){ if(stubs[req]) return stubs[req]; return load.apply(this, arguments); };
-  delete require.cache[require.resolve(path.join(raiz, 'functions', 'index.js'))];
-  const F = require(path.join(raiz, 'functions', 'index.js'));
-  Module._load = load;
-
-  const T = F._PRO_LEAGUE_TYPE, N = F._PRO_ESCOLHE, CID = '1758600000000';
-  const cod = (t) => Buffer.from(t.map(p => p.speciesId + ':' + p.level + (p.shiny ? ':1' : '')).join(','))
-    .toString('base64').replace(/=+$/, '');
-  const cyc = () => db.collection('leagueCycles').doc(T + '__' + CID);
-  const sch = () => db.collection('leagues').doc('schedule_' + T);
-
-  (async () => {
     await sch().set({ cycles: [{ id: CID, scheduledTime: Date.now() - 1000,
       status: 'registering', proFaixa: 0 }], proFaixaIdx: 0 });
     for(let i = 0; i < 8; i++){

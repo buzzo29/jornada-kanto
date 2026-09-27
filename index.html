@@ -3724,6 +3724,21 @@
      o mesmo remendo das plaquinhas de nome da Corrida. Se um dia o numero incomodar, a regua e
      o COR_ILHAS, e escurece-lo conserta os DOIS lugares de uma vez. */
   .novidades-box .btn.primary{text-shadow:0 1px 2px rgba(0,0,0,.55);}
+  /* ⚠️ O PÓDIO DA SEMANA (o popup do fim de semana das Ilhas). Ele reusa a `novidades-box` --
+     o teto de 85vh e a coluna de três andares -- e o que é próprio dele é só a LISTA que rola:
+     são até 5 pódios × 3 degraus, e sem o `min-height:0` o miolo não encolhe e a caixa estoura
+     o teto, que é a mesma armadilha da `novidades-lista` logo acima. */
+  .podio-semana{flex:1 1 auto;min-height:0;overflow-y:auto;text-align:left;margin:8px 0;}
+  .podio-semana-jogo{margin-bottom:10px;}
+  .podio-semana-jogo h3{margin:0 0 3px;font-size:.62rem;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--muted);border-bottom:1px dashed var(--box-border-soft,#d9d5c4);padding-bottom:2px;}
+  /* `minmax(0,1fr)` no nome: `1fr` não encolhe abaixo do conteúdo e um nome comprido empurraria
+     a linha pra fora dos 320px -- a armadilha que a fileira de cinco cards da home já pagou. */
+  .podio-semana-linha{display:grid;grid-template-columns:20px minmax(0,1fr) auto;gap:6px;
+    align-items:baseline;font-size:.68rem;line-height:1.5;}
+  .podio-semana-linha .podio-nome{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .podio-semana-linha .podio-valor{font-weight:700;white-space:nowrap;}
+  .podio-semana-mais{font-size:.58rem;color:var(--muted);}
   .novidades-lista b{display:block;font-size:.7rem;line-height:1.3;}
   .novidades-lista .novidades-resumo{display:block;font-size:.66rem;line-height:1.35;color:var(--muted);}
   .ilhas-mapa .ilha-selo{display:block;line-height:46px;font:800 18px/46px var(--font-ui);}
@@ -9375,6 +9390,13 @@ async function loadPermanentUserData(){
        ZERADA. Reproduzido: fecha, a releitura apaga, e o modal abre de novo.
        A regra é a do `arrayUnion` da Pokédex: esta marca só CRESCE. */
     game.novidadeVista = d.novidadeVista || game.novidadeVista || null;   // ver conferirNovidades
+    /* ⚠️ ELA SÓ AVANÇA, e o `>` é literal: o id da semana é `AAAA-MM-DD`, então comparar como
+       texto já é comparar como data. É a mesma razão da linha acima (a gravação é best-effort e
+       este carregamento roda toda vez que se volta pra home), com um degrau a mais: aqui a marca
+       não é um booleano, e ficar com a semana VELHA reabriria o popup que o jogador já fechou. */
+    if(!game.ilhasResumoVisto || String(d.ilhasResumoVisto || '') > game.ilhasResumoVisto){
+      game.ilhasResumoVisto = d.ilhasResumoVisto || game.ilhasResumoVisto || null;
+    }
     /* ⚠️ `|| game.visitouOsNinhos` PELA MESMA RAZÃO DA LINHA ACIMA, e ela valia aqui desde sempre:
        o `visitarOsNinhos` grava best-effort (sem await) e este carregamento roda toda vez que se
        volta pra HOME -- quem visitasse e voltasse antes de a gravação propagar tinha a marca
@@ -20535,7 +20557,13 @@ const CAMPOS_DA_CONTA = [
   /* ⚠️ O ANÚNCIO DAS NOVIDADES: `novidadeVista` é a marca de quem já leu (da CONTA, como o `hms`)
      e `novidadesModal` é o estado de tela. Sem os dois aqui o `resetGame` os apagaria ao abrir um
      save, e o anúncio voltaria a aparecer pra quem já o leu. Ver conferirNovidades. */
-  'novidadeVista','novidadesModal'
+  'novidadeVista','novidadesModal',
+  /* ⚠️ O PÓDIO DA SEMANA DAS ILHAS: `ilhasResumoVisto` é a marca de quem já viu (da CONTA, como o
+     `novidadeVista`), `ilhasResumo` é o dado na tela e `ilhasResumoPedido` é o "já perguntei nesta
+     sessão". Sem os três aqui o `resetGame` os apagaria ao abrir um save -- e o popup voltaria a
+     aparecer pra quem já o fechou, mais uma ida ao servidor por save aberto. Ver
+     conferirResumoDasIlhas. */
+  'ilhasResumoVisto','ilhasResumo','ilhasResumoPedido'
 ];
 function snapshotDaConta(){
   const o = {};
@@ -37697,10 +37725,34 @@ function rankAbasHtml(qual, semanaId){
    ela promete e um PREMIO: uma tela dizendo "Doces Raros" e a outra dizendo outra coisa manda o
    jogador procurar qual das duas vale. (E o prazo sai do `trainersLeagueDateStrPlusDays`, nunca de
    uma conta propria: ele e a MESMA regra de data que o cron usa pra fechar a semana.) */
+/* ⚠️ A TABELA DE PRÊMIOS TEM CÓPIA AQUI desde 27/09/2026, e é o molde do `MOEDA_MODO_DIFICIL`:
+   quem PAGA é o servidor (`RANK_SEMANAL_PREMIOS`, no functions/index.js), e o cliente precisa dos
+   números pra a nota da aba e pro popup do fim de semana NÃO mentirem. `tools/test-rank-semanal.js`
+   lê o servidor e confere que as duas são o mesmo -- sem isso a tela prometeria o prêmio velho no
+   dia em que a tabela mudasse, que é a família de defeito que este projeto mais paga.
+   ⚠️ E O POPUP RECEBE A TABELA DO SERVIDOR na resposta: lá ela é a verdade daquela semana. Esta
+   cópia é o que a nota usa ANTES de qualquer chamada -- ela desenha junto com o ranking. */
+const RANK_PREMIOS_TELA = [
+  { doces: 1, moedas: 0  },
+  { doces: 0, moedas: 75 },
+  { doces: 0, moedas: 30 }
+];
+const MEDALHAS_DO_PODIO = ['🥇','🥈','🥉'];
+function premioSemanalCurto(p){
+  if(!p) return '';
+  if(p.doces) return '🍬 ' + p.doces + ' Doce' + (p.doces > 1 ? 's' : '') + ' Raro' + (p.doces > 1 ? 's' : '');
+  return '🪙 ' + p.moedas;
+}
+/* ⚠️ A FRASE É MONTADA DA TABELA, nunca escrita: ela dizia "ganhe Doces Raros" pros três degraus, e
+   desde 27/09 só o 1º leva doce -- escrita à mão ela envelheceria de novo no próximo reajuste. */
+function premiosSemanaisHtml(premios){
+  const tab = (Array.isArray(premios) && premios.length) ? premios : RANK_PREMIOS_TELA;
+  return tab.map((p, i) => (MEDALHAS_DO_PODIO[i] || '') + ' ' + premioSemanalCurto(p)).join(' · ');
+}
 function notaDoPremioSemanal(semanaId, extra){
   const fimStr = semanaId ? trainersLeagueDateStrPlusDays(semanaId, 6) : '';
   const ate = fimStr ? ' <span class="rank-aba-desde">(Até ' + fimStr.slice(8,10) + '/' + fimStr.slice(5,7) + ')</span>' : '';
-  return `<p class="rank-aba-nota">🏅 Lidere até o fim da semana e ganhe Doces Raros${ate}`
+  return `<p class="rank-aba-nota">🏅 Lidere a semana: ${premiosSemanaisHtml()}${ate}`
     + (extra ? `<br>${extra}` : '') + `</p>`;
 }
 /* ⚠️ QUAL LISTA DESENHAR sai daqui, e não de um `if` em cada tela: três cópias divergiriam no
@@ -39711,6 +39763,9 @@ function abrirIlhas(){
   game.modoBloqueado = null;
   game.screen = 'ilhas';
   render();
+  /* ⚠️ DEPOIS do `render()`, e sem `await`: a tela não pode esperar uma ida ao servidor pra
+     aparecer. Quando a resposta chega ela mesma redesenha, e só se o jogador ainda estiver aqui. */
+  conferirResumoDasIlhas();
 }
 /* ⚠️ A SAÍDA DEPENDE DE COMO SE ENTROU: pelo botão da home ela volta pra home; pela JORNADA ela
    volta pra jornada -- devolver o jogador à home no meio de um trecho seria tirá-lo da partida.
@@ -39889,9 +39944,103 @@ function renderIlhas(){
   <button class="btn" onclick="sairDasIlhas()">${naJornadaDasIlhas()
     ? (ilhasFechouTudo() ? 'Receber o prêmio e seguir ➜' : '⬅ Encerrar a travessia e seguir')
     : '⬅ Voltar'}</button>
-  ${renderIlhaInfoModal()}`;
+  ${renderIlhaInfoModal()}
+  ${/* ⚠️ O PÓDIO VEM POR ÚLTIMO de propósito: os modais empilham na ordem em que entram, e este
+       é o que BLOQUEIA -- vindo antes, o (i) de uma ilha abriria por cima dele. */''}
+  ${renderIlhasResumoModal()}`;
 }
 
+/* ============================================================================
+   O PÓDIO DA SEMANA QUE FECHOU (27/09/2026, a pedido: *"quando zerar, exibir um popup indicando o
+   top 3 de cada modo das ilhas laranjas essa semana, somente para a primeira vez que o usuario ver
+   essa tela, depois nao precisa mais exibir"*).
+
+   ⚠️ QUEM DECIDE É O SERVIDOR, e não esta tela: a semana que fechou, se o prêmio já foi pago e se
+   esta conta já viu o resumo saem todos do `getIslandsWeeklyPodium`. O cliente não pode calcular a
+   semana -- é a mesma razão do Pokémon da Arena: o relógio do celular decidiria a virada, e dois
+   jogadores lado a lado veriam pódios de semanas diferentes.
+
+   ⚠️ A PERGUNTA É UMA POR SESSÃO (`ilhasResumoPedido`), e isso não é zelo: o `abrirIlhas` é a
+   ÚNICA porta de volta dos cinco jogos, então uma visita completa passa por ele 6 vezes -- sem a
+   marca seriam 6 idas ao servidor por visita pra uma resposta que muda uma vez por semana.
+
+   ⚠️ E O `render()` SÓ ACONTECE NA TELA DAS ILHAS. A resposta chega por promessa, e o jogador pode
+   já estar dentro de um minigame quando ela volta -- um `render()` ali recria o HTML e mata a
+   animação em curso, a regra da casa que já custou cinco defeitos. O dado fica guardado e o modal
+   nasce quando ele voltar pro mapa, porque é o `renderIlhas` que o desenha.
+   ============================================================================ */
+async function conferirResumoDasIlhas(){
+  if(game.ilhasResumoPedido) return;
+  if(!game.authUser || typeof functionsClient === 'undefined' || !functionsClient) return;
+  game.ilhasResumoPedido = true;
+  try{
+    const r = await functionsClient.httpsCallable('getIslandsWeeklyPodium')({});
+    const d = (r && r.data) || {};
+    /* `visto` é a saída curta do servidor (1 leitura); a segunda guarda é a marca em memória, que
+       cobre a sessão em que ele acabou de fechar o popup e a gravação ainda não propagou. */
+    if(!d.pronto || d.visto) return;
+    if(game.ilhasResumoVisto === d.semanaId) return;
+    game.ilhasResumo = d;
+    if(game.screen === 'ilhas') render();
+  }catch(e){ console.error('Erro ao ler o pódio da semana das Ilhas:', e); }
+}
+/* ⚠️ FECHAR É O QUE MARCA, e a gravação é best-effort -- o molde do `marcarNovidadesLidas`: se ela
+   falhar o popup volta na próxima entrada, que é o lado certo pra errar (ver duas vezes é melhor
+   que nunca ver). O `game` é escrito na hora pra ele não reabrir nesta sessão. */
+function fecharResumoDasIlhas(){
+  const sem = (game.ilhasResumo || {}).semanaId || null;
+  game.ilhasResumo = null;
+  if(sem){
+    game.ilhasResumoVisto = sem;
+    if(game.authUser){
+      userDocRef(game.authUser.uid).set({ ilhasResumoVisto: sem }, { merge: true })
+        .catch(e => console.error('Erro ao gravar o pódio da semana lido:', e));
+    }
+  }
+  render();
+}
+/* ⚠️ A UNIDADE VEM DO SERVIDOR (o `unidade` e o `maior` das `RANKS_SEMANAIS`), nunca deduzida do
+   nome do jogo: a Arena conta NÍVEL, a Corrida conta TEMPO (menor é melhor) e os outros dois contam
+   PONTOS. Uma segunda regra aqui diria "com 12 pontos" onde o certo é "nível 12" -- e é exatamente
+   o que a notificação do prêmio já teve de resolver. */
+function podioValorDaSemana(p, v){
+  if(p.unidade === 'nivel') return 'nível ' + v;
+  if(p.maior) return v + ' pts';
+  return Number(v).toFixed(2).replace('.', ',') + 's';
+}
+function renderIlhasResumoModal(){
+  const d = game.ilhasResumo;
+  if(!d || !Array.isArray(d.podios) || !d.podios.length) return '';
+  const sem = d.semanaId || '';
+  const fim = sem ? trainersLeagueDateStrPlusDays(sem, 6) : '';
+  const dm = (s) => s ? s.slice(8,10) + '/' + s.slice(5,7) : '';
+  const blocos = d.podios.map(p => {
+    const linhas = (p.degraus || []).map(g => {
+      /* ⚠️ O DEGRAU PODE SER DIVIDIDO (o pódio é de PLACAR distinto, não de pessoa), e o `total` é
+         quem diz quantos são -- cortar a lista sem o "+N" esconderia gente que GANHOU o prêmio. */
+      const nomes = (g.nomes || []).map(n => escapeHtmlSafe(n)).join(', ');
+      const sobra = (g.total || 0) - (g.nomes || []).length;
+      const mais = sobra > 0 ? ` <span class="podio-semana-mais">+${sobra}</span>` : '';
+      return `<div class="podio-semana-linha"><span>${MEDALHAS_DO_PODIO[(g.pos||1)-1] || ''}</span>`
+        + `<span class="podio-nome">${nomes || '—'}${mais}</span>`
+        + `<span class="podio-valor">${podioValorDaSemana(p, g.valor)}</span></div>`;
+    }).join('');
+    return `<div class="podio-semana-jogo"><h3>${escapeHtmlSafe(p.rotulo || '')}</h3>${linhas}</div>`;
+  }).join('');
+  return `
+  <div class="modal-overlay" onclick="fecharResumoDasIlhas()">
+    <div class="modal-box novidades-box" onclick="event.stopPropagation()">
+      <h2>${selo('ilhas', 'selo-titulo')} A semana fechou</h2>
+      ${/* ⚠️ A FRASE DIZ O PERÍODO, e é ela que explica por que o pódio apareceu agora: sem a data
+           o jogador não tem como saber se é o desta semana ou o da passada -- e é justamente o da
+           PASSADA, porque a corrente ainda está rolando. */''}
+      <p>Pódio das Ilhas Laranja de <strong>${dm(sem)} a ${dm(fim)}</strong>. Os prêmios já foram pagos.</p>
+      <div class="podio-semana">${blocos}</div>
+      <p class="rank-aba-nota">${premiosSemanaisHtml(d.premios)}</p>
+      <button class="btn primary" onclick="fecharResumoDasIlhas()">Beleza!</button>
+    </div>
+  </div>`;
+}
 /* ------------------------------------------------------------------
    O ANÚNCIO DAS NOVIDADES NA HOME (21/09/2026, a pedido: *"quando os usuários abrirem o jogo pela
    primeira vez, coloque para exibir um modal na tela home com os updates, fale das ilhas laranjas

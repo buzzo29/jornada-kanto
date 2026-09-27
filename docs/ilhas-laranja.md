@@ -5240,6 +5240,53 @@ mesma: **a Torre paga 21 doces por semana no teto**, 1,5× o conjunto das Ilhas.
 **Se um dia incomodar**, a régua é o `RANK_SEMANAL_PREMIOS` — e ela vale pros CINCO de uma vez, que
 é o que a tabela única compra.
 
+⚠️ **E OS NÚMEROS DESTE PARÁGRAFO ESTAVAM ERRADOS — medido em 27/09/2026:** o teto era
+**15 doces + 🪙 250**, não 14 + 200. A conta é direta (5 pódios × 3 degraus = 5×3 doces e 5×50
+moedas) e a linha acima esqueceu o 3º degrau do quinto pódio. Em valor de loja eram **🪙 4.750**,
+não 4.400.
+
+#### ⚠️ E O QUE A TABELA NOVA CUSTA (27/09/2026)
+
+| teto por semana (exige 3 placares distintos nos 5 pódios) | antes | agora |
+|---|---|---|
+| Doces Raros | 15 | **5** |
+| moedas | 🪙 250 | **🪙 525** |
+| em valor de loja (o doce custa 300) | 🪙 4.750 | **🪙 2.025** |
+| em renda de jogo (a jornada paga 70) | 67,9 jornadas | **28,9 jornadas** |
+| por ano | 780 doces | **260** |
+| contra a Torre (21 doces/semana no teto) | 0,71× | **0,24×** |
+
+**⚠️ É UM CORTE DE 57% NA TORNEIRA, e ele vem quase todo do DOCE:** o 1º degrau caiu de 2 pra 1, e o
+2º trocou **1 doce (🪙 300) por 🪙 75** — ou seja o vice perde 75% do valor. Quem ganha é o 3º, que
+sai de 🪙 50 pra 🪙 30… ⚠️ **não, ele também perde** (−40%). **Os três degraus pagam menos**, e é
+isso que o pedido escolheu.
+
+**Se um dia incomodar**, a régua continua sendo o `RANK_SEMANAL_PREMIOS` — e a conta de quanto vale
+um doce em jogo está aqui: 1 doce é +1 nível, que sozinho vale **+0,54 ponto** de vitória (dentro do
+ruído); o que ele compra é ACÚMULO (+5 níveis valem +4,25 e +10 valem +8,19).
+
+### ⚠️ E A NOTA DA TELA PASSOU A SER MONTADA DA TABELA
+
+A frase da aba dizia *"🏅 Lidere até o fim da semana e ganhe **Doces Raros**"* — e com a tabela nova
+isso é **texto de prêmio que mente**: só o 1º leva doce. Hoje ela sai do
+`premiosSemanaisHtml()`: *"🏅 Lidere a semana: 🥇 🍬 1 Doce Raro · 🥈 🪙 75 · 🥉 🪙 30 (Até 27/09)"*.
+
+- **⚠️ A TABELA TEM CÓPIA NO CLIENTE** (`RANK_PREMIOS_TELA`), e é o molde do `MOEDA_MODO_DIFICIL`:
+  quem PAGA é o servidor, e a tela precisa dos números pra a nota e pro pódio não mentirem.
+  `tools/test-rank-semanal.js` lê as duas e cobra que sejam a mesma.
+- **⚠️ E A TRAVA DA NOTA LÊ A FUNÇÃO, nunca o arquivo inteiro:** a primeira versão dela procurava a
+  frase velha no HTML todo e acusava **o próprio comentário** que explica por que ela saiu — a
+  família que o CLAUDE.md já registra ("citar nome de líder num comentário faz um teste que procura
+  nome de líder acusar o comentário").
+- **Medido a 320px: ela não custa nada** — velha e nova ficam as duas em **2 linhas / 29px**, e com
+  a segunda linha da Arena as duas ficam em 3 / 43px.
+
+⚠️ **E QUATRO ARQUIVOS DE TESTE CAÍRAM DE UMA VEZ** ao mexer nesta tabela única (`test-rank-semanal`,
+`test-arena-rank`, `test-arena` e `test-convidado`), porque eles **cravavam o número**. Nenhum foi
+afrouxado: eles passaram a **derivar** da tabela e a cobrar a REGRA — cada degrau paga o que ela
+manda, o empatado no topo leva o MESMO do 1º, e o **pagamento DESCE degrau a degrau**. Só **uma**
+continua cravada, de propósito: a que prova que o PEDIDO foi feito.
+
 #### ⚠️ E O BASH COMEU DUAS PALAVRAS DE UM COMENTÁRIO
 
 Escrevendo o patch por `node -e` dentro do Bash, as **crases** do comentário (\`unidade\`,
@@ -5672,6 +5719,100 @@ colocado ganha 50 moedas, reseta toda segunda feira meia noite, e mantem o rank 
 rankings, coloque 2 abas no ranking que existe hoje, e pode copiar os dois igual, porque como
 começou antes de ontem, só teve essa semana"*.
 
+### O PÓDIO DA SEMANA QUE FECHOU: o popup (27/09/2026)
+
+Pedido assim: *"quando os usuarios entrarem depois de ter finalizado o ranking semanal ... quando
+zerar, exibir um popup indicando o top 3 de cada modo das ilhas laranjas essa semana, somente para
+a primeira vez que o usuario ver essa tela, depois nao precisa mais exibir"*.
+
+Ele aparece na **tela-hub das Ilhas** (o `abrirIlhas`, que é a porta única dos cinco jogos), com os
+**5 pódios** da semana que acabou: Pescaria, Resgate, Corrida individual, Corrida em revezamento e
+Arena 1x1. (A **Kumquat/Seleção não tem ranking semanal**, então ela não entra — não há o que
+mostrar.)
+
+#### ⚠️ O `podium_` SOZINHO NÃO SERVIA: ele é uma lista de PLACARES
+
+O fechamento já gravava `podium_<campo>` desde 23/09 — só que ele guarda os **valores distintos**,
+não quem os fez. Um popup que diz *"900, 700, 500"* sem dizer QUEM não anuncia nada.
+
+Hoje o fechamento grava também **`resumo_<campo>`**: `{pos, valor, total, nomes}` por degrau.
+
+- **⚠️ ELE É ESCRITO NA MESMA GRAVAÇÃO DO PÓDIO**, ou seja **antes de pagar e antes do `awarded`** —
+  a mesma ordem que protege o pagamento. O laço pode estourar no meio e a volta seguinte do cron só
+  refaz o que faltou; escrito depois, uma semana meio-paga ficaria **sem resumo pra sempre**.
+- **⚠️ O `total` É QUEM DIVIDE O DEGRAU, e não o tamanho da lista:** o pódio é de **placar
+  distinto**, então um degrau pode ter dez empatados. A tela corta em `RANK_RESUMO_MAX_NOMES` (5) e
+  diz **"+N"** — cortar em silêncio esconderia gente que GANHOU o prêmio.
+- **Os nomes vão ORDENADOS**, pra o corte ser o mesmo em toda leitura: sem isso ele dependeria da
+  ordem em que o Firestore devolveu os documentos.
+
+#### AS DECISÕES DA CALLABLE (`getIslandsWeeklyPodium`)
+
+- **⚠️ A SEMANA É A ANTERIOR, nunca a corrente.** Mostrar a corrente seria anunciar um pódio que
+  ainda muda — e é pela mesma razão que **o cron só paga a anterior**.
+- **⚠️ E ELA SÓ MOSTRA O QUE JÁ FOI PAGO** (a marca `awarded_<campo>`). A semana vira à meia-noite
+  de segunda e o cron passa **de hora em hora**: há uma janela de até uma hora em que ela acabou e
+  o prêmio ainda não saiu. Anunciar ali seria anunciar um resultado **antes de pagar** — e se o
+  fechamento mudasse alguma coisa (um placar que chegou atrasado), o popup teria mentido. Sem marca
+  ela devolve `pronto:false`, **o cliente NÃO marca**, e o jogador vê na entrada seguinte.
+- **⚠️ A SAÍDA CURTA VEM PRIMEIRO, e é ela que paga a conta:** quem já viu custa **1 leitura**, e
+  essa é a maioria esmagadora das chamadas — a tela das Ilhas abre várias vezes por visita e o
+  popup é **uma vez por semana**. Quem ainda não viu custa 5 (a conta + 4 documentos: os 5 pódios
+  moram em 4 docs, porque a Corrida tem duas modalidades no mesmo).
+- **⚠️ A MARCA É O `semanaId`, nunca um booleano** — com um booleano este seria o único resumo da
+  vida do jogador, e o da semana seguinte não teria como aparecer. É a lição que o `novidadeVista`
+  já pagou, e **quem marca é o CLIENTE**, pelo mesmo motivo dele: o campo é registro de LEITURA e
+  não poder de compra, então continua **livre pro dono** no `firestore.rules` — não houve uma linha
+  a mexer lá.
+- **O convidado passa**, de propósito: ele joga as Ilhas desde 21/09, então pode estar no pódio.
+
+#### NA TELA
+
+- **⚠️ A PERGUNTA É UMA POR SESSÃO** (`ilhasResumoPedido`): o `abrirIlhas` é a **única porta de
+  volta** dos cinco jogos, então uma visita completa passa por ele **6 vezes** — sem a marca seriam
+  6 idas ao servidor por visita pra uma resposta que muda uma vez por semana.
+- **⚠️ E O `render()` SÓ ACONTECE NA TELA DAS ILHAS.** A resposta chega por promessa e o jogador
+  pode já estar dentro de um minigame quando ela volta — um `render()` ali recria o HTML e **mata a
+  animação em curso**, a regra da casa que já custou cinco defeitos. O dado fica guardado e o modal
+  nasce quando ele voltar pro mapa.
+- **⚠️ O MODAL VEM POR ÚLTIMO no `renderIlhas`**: os modais empilham na ordem em que entram, e este
+  é o que **bloqueia** — vindo antes, o (i) de uma ilha abriria por cima dele.
+- **⚠️ A UNIDADE VEM DO SERVIDOR** (o `unidade` e o `maior` das `RANKS_SEMANAIS`), nunca deduzida do
+  nome do jogo: a Arena conta **nível**, a Corrida conta **tempo** (menor é melhor) e os outros dois
+  contam **pontos**. Uma segunda regra aqui diria *"com 12 pontos"* onde o certo é *"nível 12"* — e
+  é exatamente o que a notificação do prêmio já teve de resolver.
+- Os três campos (`ilhasResumoVisto`, `ilhasResumo`, `ilhasResumoPedido`) estão no
+  `CAMPOS_DA_CONTA`: sem eles o `resetGame` os apagaria ao abrir um save.
+
+**MEDIDO A 320px, no pior caso** (os 5 pódios com os 3 degraus cheios, um degrau dividido com mais
+gente que o teto de nomes, e as três unidades):
+
+| | |
+|---|---|
+| o modal | **280 × 483px** — exatamente o teto (85vh de 568) |
+| a lista | **233 visíveis de 368** de conteúdo: ela **rola por dentro** |
+| o que se lê sem rolar | **9 linhas de 14**, e **3 pódios inteiros de 5** |
+| o botão e a nota do prêmio | **dentro** do modal (a coluna de três andares funciona) |
+| nomes truncados | **1 de 14** — o "TreinadorNomeComprido" de propósito |
+| rolagem lateral | **nenhuma** |
+
+⚠️ **E A PRIMEIRA MEDIÇÃO FOI A DIMENSÃO ERRADA:** no palco da prévia o modal deu **280 × 619** e
+**nada** rolava — porque o `85vh` é da **JANELA**, e ali ela tem 945px de altura. Medir assim dá
+verde num modal que no celular **não cabe**. O número que vale saiu de forçar o teto em 483px, que é
+85% dos 568 do alvo da casa.
+
+⚠️ **E ENXUGAR O CROMO PIOROU, medido nos dois estados:** mandar *"Os prêmios já foram pagos"* pra
+nota de baixo pra comprar uma linha de lista deu **8 de 14** em vez de 9 (a lista caiu de 233 pra
+218px) — o parágrafo continuava em 2 linhas de qualquer jeito. **Desfeito.**
+
+**A tela entrou no `tools/gerar-preview.js`** (a 37ª), com o pior caso montado — ela é a que mais
+tem o que estourar, e sem ela a próxima medição seria mais uma prévia descartável.
+
+**NO MOTOR, NADA:** `MOTOR 4d7f5a07207a / DIARIO aeaa966b3003`, idêntico antes e depois — e o
+instrumento foi conferido sensível (com o `CRIT_BASE` mexido os dois hashes andam).
+
+`tools/test-rank-semanal.js` tranca 30 pontas, e **15 de 15 defeitos religados acusam**.
+
 ### ⚠️ NÃO EXISTE "RESETAR" — cada semana é uma SUBCOLEÇÃO própria
 
 `<base>Weekly/<segunda>/players/<uid>`. Semana nova é **outra subcoleção**, então **não há o que
@@ -5712,9 +5853,14 @@ Sem isso a aba da semana mostraria os mesmos números da de sempre e a feature n
 
 | | |
 |---|---|
-| **1º** | 2 Doces Raros |
-| **2º** | 1 Doce Raro |
-| **3º** | 🪙 50 moedas |
+| **1º** | 1 Doce Raro |
+| **2º** | 🪙 75 moedas |
+| **3º** | 🪙 30 moedas |
+
+⚠️ **ELES MUDARAM EM 27/09/2026, a pedido** (*"de para o primeiro lugar de cada semana, 1 rare
+candy, para o segundo colocado, 75 moedas e para o terceiro colocado, 30 moedas"*). Eram
+**2 doces / 1 doce / 🪙 50**, e o que isso custa está medido em **⚠️ E O QUE A TABELA NOVA CUSTA**,
+logo abaixo.
 
 - **⚠️ O PÓDIO É DE PLACAR, NÃO DE PESSOA** — a regra que a Torre já pratica: com dois empatados no
   topo, os **DOIS** são líderes e o 2º degrau é o próximo placar que teve alguém. Medido: cinco

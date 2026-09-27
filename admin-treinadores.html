@@ -444,6 +444,9 @@ function render(){
    callable vai recusar é pior que não oferecer -- o admin clica e leva um erro que a tela já sabia.
    A conta da tela é a MESMA do servidor (8 insígnias, time montado, não aposentado), e quando elas
    discordarem quem manda é o servidor: ele recusa e a mensagem aparece. */
+function diaCurto(dateId){
+  return (typeof dateId === 'string' && dateId.length >= 10) ? dateId.slice(8,10) + '/' + dateId.slice(5,7) : '';
+}
 function timesAptosDaConta(t){
   return (t.saves || []).filter(s => !s.aposentado && (s.insignias || 0) >= 8 && (s.time || []).length).length;
 }
@@ -451,7 +454,11 @@ function botaoDaTrainersHtml(t){
   const aptos = timesAptosDaConta(t);
   if(!aptos) return '';
   const inscrito = estado.trainersInscritos && estado.trainersInscritos[t.uid];
-  if(inscrito) return '<p class="onde ok">✅ inscrito na Trainers League de hoje (' + inscrito + ' time' + (inscrito === 1 ? '' : 's') + ')</p>';
+  /* ⚠️ ELE DIZ O DIA, e não "de hoje": depois da trava das 11h a inscrição vai pro dia SEGUINTE
+     (o `trainersLeagueActiveDateId` do servidor), então "hoje" seria uma data errada em metade
+     das horas do dia -- e foi por escrever "hoje" que a guarda da callable nasceu errada. */
+  if(inscrito) return '<p class="onde ok">✅ inscrito na Trainers League de ' + esc(inscrito.dia || '?')
+    + ' (' + inscrito.times + ' time' + (inscrito.times === 1 ? '' : 's') + ')</p>';
   return `<button class="btn secondary" onclick="inscreverNaTrainers('${esc(t.uid)}')"`
     + ` ${estado.trainersCarregando ? 'disabled' : ''}>🥊 Inscrever na Trainers League`
     + ` <small>(${aptos} time${aptos === 1 ? '' : 's'})</small></button>`;
@@ -465,8 +472,8 @@ async function inscreverNaTrainers(uid){
     const r = await fns.httpsCallable('adminAddTrainersLeagueRegistration')({ uid });
     const d = (r && r.data) || {};
     estado.trainersInscritos = estado.trainersInscritos || {};
-    estado.trainersInscritos[uid] = d.times || 1;
-    estado.filaAcao = '✅ ' + (d.nome || uid) + ' inscrito na Trainers League de ' + (d.dateId || 'hoje')
+    estado.trainersInscritos[uid] = { times: d.times || 1, dia: diaCurto(d.dateId) };
+    estado.filaAcao = '✅ ' + (d.nome || uid) + ' inscrito na Trainers League de ' + (diaCurto(d.dateId) || 'hoje')
       + ' com ' + (d.times || '?') + ' time(s).'
       + (d.contador != null ? ' Agora são ' + d.contador + ' inscritos.' : '');
   }catch(e){ estado.filaErro = 'Não deu pra inscrever na Trainers League: ' + (e && e.message ? e.message : e); }

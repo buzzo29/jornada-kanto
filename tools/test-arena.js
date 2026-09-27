@@ -297,8 +297,15 @@ console.log('\n=== A TRAVESSIA CONTINUA COM O ADVERSÁRIO PAREADO ===');
     /* ⚠️ A NOTA DO PRÊMIO É A MESMA DOS OUTROS TRÊS (24/09/2026): a Arena passou a pagar, e uma tela
        que esconde o prêmio não convida ninguém. O "com o Pokémon novo" fica como segunda linha --
        ele é o que ESTA Arena tem de diferente (lá zera o placar, aqui zera o ADVERSÁRIO). */
+    /* ⚠️ A FRASE MUDOU EM 27/09/2026 com a tabela (1 doce / 🪙 75 / 🪙 30): ela prometia "Doces
+       Raros" pros três degraus e passou a MONTAR os prêmios da tabela -- texto de prêmio que mente
+       é a família que este projeto mais paga. O que a trava cobra continua sendo o mesmo: a nota é
+       a MESMA dos outros três, e ela NOMEIA o prêmio. */
     ok('  e a nota do prêmio, a MESMA dos outros três rankings',
-       h.indexOf('Lidere até o fim da semana e ganhe Doces Raros') >= 0);
+       h.indexOf('Lidere a semana:') >= 0);
+    ok('    e ela NOMEIA os três prêmios da tabela',
+       h.indexOf('🥇') >= 0 && h.indexOf('🥈') >= 0 && h.indexOf('🥉') >= 0
+       && /Doce Raro/.test(h) && /🪙 75/.test(h) && /🪙 30/.test(h));
     ok('    e ela diz o que ESTA Arena tem de diferente (o Pokémon novo)',
        h.indexOf('com o Pokémon novo') >= 0);
     /* ⚠️ NÃO HÁ ABA "DE SEMPRE": um ranking de sempre compararia níveis contra espécies diferentes. */
@@ -320,7 +327,7 @@ console.log('\n=== A TRAVESSIA CONTINUA COM O ADVERSÁRIO PAREADO ===');
     /* ⚠️ E O VAZIO TAMBÉM CONVIDA: sem a nota, a primeira semana de um jogador abriria uma caixa que
        só diz "ninguém venceu" -- e é justamente ali que o prêmio é o argumento pra jogar. */
     ok('    e ele convida com o prêmio',
-       S.renderQueimada().indexOf('ganhe Doces Raros') >= 0);
+       S.renderQueimada().indexOf('Lidere a semana:') >= 0);
     /* ⚠️ O CSS: tamanho de src e centralização NÃO aparecem em asserção de HTML nenhuma -- é a
        lição do `[hidden]` que deixou o modal da contagem da Corrida preso na tela. */
     const css = src.slice(src.indexOf('<style'), src.indexOf('</style>'));
@@ -351,8 +358,8 @@ console.log('\n=== A TRAVESSIA CONTINUA COM O ADVERSÁRIO PAREADO ===');
        versão desta trava procurava a frase FORA da função e acusava a PRÓPRIA função que ela mede:
        a armadilha do padrão largo demais, dentro da trava. */
     ok('    e a frase do prêmio existe UMA vez só (nenhuma cópia)',
-       (src.match(/Lidere até o fim da semana e ganhe Doces Raros/g) || []).length === 1,
-       (src.match(/Lidere até o fim da semana e ganhe Doces Raros/g) || []).length + ' ocorrência(s)');
+       (src.match(/Lidere a semana:/g) || []).length === 1,
+       (src.match(/Lidere a semana:/g) || []).length + ' ocorrência(s)');
   }
 
   /* ---------- 9) a abertura ---------- */

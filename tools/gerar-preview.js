@@ -233,6 +233,36 @@ game.novidadesModal = true;
 add('Ligas', 'Anúncio da Liga Pro', ()=>sb.renderNovidadesModal());
 game.novidadesModal = false;
 
+/* ⚠️ O PÓDIO DA SEMANA DAS ILHAS (27/09/2026) -- o PIOR CASO de propósito: os CINCO pódios com os
+   três degraus cheios, o degrau dividido com mais gente que o teto de nomes, e os três tipos de
+   unidade (pontos, TEMPO e nível). É a tela que mais tem o que estourar: 5 x 3 linhas num modal de
+   85vh, e a lista tem que rolar POR DENTRO em vez de empurrar o botão pra fora. */
+game.ilhasResumo = { semanaId:'2026-09-21', pronto:true,
+  premios: [{ doces:1, moedas:0 }, { doces:0, moedas:75 }, { doces:0, moedas:30 }],
+  podios: [
+    { rotulo:'Pescaria', unidade:null, maior:true, degraus:[
+      { pos:1, valor:1240, total:2, nomes:['TreinadorNomeComprido','Bia'] },
+      { pos:2, valor:980,  total:1, nomes:['Cida'] },
+      { pos:3, valor:760,  total:1, nomes:['Duda'] }] },
+    { rotulo:'Resgate', unidade:null, maior:true, degraus:[
+      { pos:1, valor:640, total:1, nomes:['Ash'] },
+      { pos:2, valor:520, total:1, nomes:['Misty'] },
+      { pos:3, valor:410, total:1, nomes:['Brock'] }] },
+    { rotulo:'Corrida individual', unidade:null, maior:false, degraus:[
+      { pos:1, valor:18.54, total:1, nomes:['Gary'] },
+      { pos:2, valor:19.02, total:1, nomes:['Tracey'] },
+      { pos:3, valor:21.7,  total:8, nomes:['A','B','C','D','E'] }] },
+    { rotulo:'Corrida em revezamento', unidade:null, maior:false, degraus:[
+      { pos:1, valor:88.1,  total:1, nomes:['Ritchie'] },
+      { pos:2, valor:91.35, total:1, nomes:['Casey'] }] },
+    { rotulo:'Arena 1x1', unidade:'nivel', maior:true, degraus:[
+      { pos:1, valor:14, total:3, nomes:['Drake','Luana','Rudy'] },
+      { pos:2, valor:11, total:1, nomes:['Cissy'] },
+      { pos:3, valor:9,  total:1, nomes:['Danny'] }] }
+  ] };
+add('Ilhas', 'Pódio da semana (o popup do fim de semana)', ()=>sb.renderIlhasResumoModal());
+game.ilhasResumo = null;
+
 game.screen = 'league';
 game.currentLeagueTypeId = 'classic';
 game.leagueScreenLoading = false;

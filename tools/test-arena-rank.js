@@ -173,10 +173,17 @@ function ok(titulo, cond, extra){
      reajuste de prêmio -- a família que já caiu meia dúzia de vezes neste projeto. */
   const PR = RS.RANK_SEMANAL_PREMIOS;
   ok('  o líder ganha Doce Raro', doc1.rareCandies === PR[0].doces, doc1.rareCandies + ' doce(s)');
-  ok('  o vice ganha menos que ele, e mais que zero',
-     doc2.rareCandies === PR[1].doces && PR[1].doces > 0 && PR[1].doces < PR[0].doces,
-     doc2.rareCandies + ' doce(s)');
-  ok('  o terceiro ganha moedas', doc3.moedas === PR[2].moedas, '🪙 ' + doc3.moedas);
+  /* ⚠️ ELA CRAVAVA "o vice ganha DOCE, menos que o líder" -- verdade até 27/09/2026, quando a
+     tabela virou 1 doce / 🪙 75 / 🪙 30 e o vice passou a ganhar MOEDA. A trava não foi afrouxada:
+     ela cobra o que continua sendo a REGRA -- cada degrau paga alguma coisa, e o pagamento DESCE. */
+  const valor = (p) => (p.doces || 0) * 300 + (p.moedas || 0);    // o doce custa 🪙 300 na loja
+  ok('  o vice ganha o que a tabela manda, e menos que o líder',
+     doc2.rareCandies === PR[1].doces && (doc2.moedas || 0) === PR[1].moedas
+     && valor(PR[1]) > 0 && valor(PR[1]) < valor(PR[0]),
+     (doc2.rareCandies || 0) + ' doce(s) + 🪙 ' + (doc2.moedas || 0));
+  ok('  o terceiro ganha moedas, e menos que o vice',
+     doc3.moedas === PR[2].moedas && valor(PR[2]) > 0 && valor(PR[2]) < valor(PR[1]),
+     '🪙 ' + doc3.moedas);
   ok('  e o quarto não ganha nada', !doc4.rareCandies && !doc4.moedas);
   /* ⚠️ A FRASE: "no nível 12", nunca "com 12 pontos" */
   const notas = (await db.collection('users').doc('p1').collection('notifications').get()).docs

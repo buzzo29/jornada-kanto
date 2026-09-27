@@ -105,7 +105,10 @@ const PROTEGIDAS = ['acceptOnlineMatch','challengeFriend','challengeLobbyPlayer'
      conta"). Sobram aqui o `pollFriendChallenge` e o `cancelFriendChallenge`: o poll ja nao e
      agendado pro convidado e o cancel e limpeza -- bloquea-los so daria erro em console.
    - BOSS: nao esta nos cinco, e o evento esta desligado (`BOSS_ATIVO`). */
+/* ⚠️ O PODIO DA SEMANA DAS ILHAS E LIVRE: o convidado JOGA as Ilhas (as seis portas abriram em
+   21/09 e a travessia em 23/09), entao ele pode estar no podio -- e ela so LE. */
 const LIVRES = ['activateBoughtShinyBonus','activateEliteShinyBonus','activateMewtwoLoan','activateShinyBonus',
+'getIslandsWeeklyPodium',
 'adminAddLeagueRegistration','adminAddTrainersLeagueRegistration','adminLeagueQueue','adminListTrainers',
 'adminRemoveLeagueRegistration','buyItem',
 'cancelFriendChallenge','checkMewtwoLoanUnlock','checkNeighborhoodGymDefenseForSlot','claimAchievementCoins',

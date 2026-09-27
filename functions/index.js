@@ -5281,6 +5281,41 @@ const TRAINERS_LEAGUE_MIN_TO_FORM = 4;
 function trainersLeagueCycleRef(dateId){ return db.collection('trainersLeagueCycles').doc(dateId); }
 function trainersLeagueRegistrantsRef(dateId){ return trainersLeagueCycleRef(dateId).collection('registrants'); }
 function trainersLeagueRegistrantRef(dateId, uid){ return trainersLeagueRegistrantsRef(dateId).doc(uid); }
+/* ============================================================================
+   ⚠️ QUAL DIA ACEITA INSCRICAO -- as DUAS regras abaixo sao COPIA do index.html, e a copia e o
+   preco de o servidor precisar delas: elas nasceram no cliente porque so ele inscrevia, e o
+   `admin-treinadores` (27/09/2026) foi o primeiro caminho de servidor a precisar da mesma
+   resposta. `tools/test-liga-pro.js` compara as duas copias -- o molde do `MOEDA_MODO_DIFICIL`,
+   que vive nos dois lados pelo mesmo motivo.
+
+   ⚠️ E ELAS SAO A CORRECAO DE UM DEFEITO MEU, no dia em que a inscricao por admin subiu: eu
+   escrevi a guarda com `trainersLeagueTodayDateStr()` fixo e conferi a trava das 11h DE HOJE.
+   Depois das 11h isso recusa SEMPRE ("as inscricoes de hoje ja se encerraram") enquanto o jogo
+   inscreve normalmente -- porque o jogo manda a inscricao pra AMANHA. Relatado no primeiro teste,
+   as 20h24. A licao e a de sempre aqui: REUSAR a regra, nunca reescreve-la -- e o comentario da
+   propria callable prometia que as guardas eram "as mesmas do jogador".
+   ============================================================================ */
+function trainersLeagueActiveDateId(){
+  const todayStr = trainersLeagueTodayDateStr();
+  const now = Date.now();
+  const lockTime = trainersLeagueTimeOnDate(todayStr, TRAINERS_LEAGUE_LOCK_HOUR, TRAINERS_LEAGUE_LOCK_MIN);
+  if(now < lockTime){ return todayStr; }                      // dentro da janela de hoje (ate as 11h)
+  return trainersLeagueDateStrPlusDays(todayStr, 1);          // depois da trava -- inscricoes vao pra amanha
+}
+/* a inscricao de um dia so abre quando a liga do dia ANTERIOR nao esta mais pendente/rodando:
+   terminou (complete), nunca virou liga (ficou em 'registering' ate depois da propria trava), ou
+   nem existiu. Enquanto a liga anterior roda, inscrever pro dia seguinte fica bloqueado. */
+async function trainersLeaguePrevDayDone(targetDateId){
+  const prevId = trainersLeagueDateStrPlusDays(targetDateId, -1);
+  try{
+    const snap = await trainersLeagueCycleRef(prevId).get();
+    if(!snap.exists) return true;
+    const st = snap.data().status;
+    if(st === 'complete' || st === 'cancelled') return true;
+    if(st === 'registering' && Date.now() >= trainersLeagueTimeOnDate(prevId, TRAINERS_LEAGUE_LOCK_HOUR, TRAINERS_LEAGUE_LOCK_MIN)) return true;
+    return false;   // locking/locked/active/advancing = liga anterior ainda em andamento
+  } catch(e){ logger.error('Erro ao checar a liga do dia anterior:', e); return true; }  // na duvida, nao bloqueia
+}
 // escolha de terreno (só o mandante grava) e troca de time por rodada (cada jogador grava a própria) --
 // em sub-coleções separadas, uma por jogador, em vez de campos dentro do scheduleRounds: o Firestore não
 // permite atualizar um elemento específico de um array aninhado sem reescrever o documento inteiro, o
@@ -6084,11 +6119,23 @@ function pontosDeRankingValidos(x){
 const RANK_SEMANAS_A_FECHAR = 4;   // recupera uma semana que ficou pra tras, como os 7 dias da Torre
 /* ⚠️ O PODIO E DE PLACAR DISTINTO, nao de pessoa -- a regra que a Torre ja pratica: com dois
    empatados no topo, os DOIS sao lideres e o 2o degrau e o proximo placar que teve alguem. */
+/* ⚠️ A TABELA MUDOU EM 27/09/2026, a pedido: *"de para o primeiro lugar de cada semana, 1 rare
+   candy, para o segundo colocado, 75 moedas e para o terceiro colocado, 30 moedas"*. Era
+   2 doces / 1 doce / 50 moedas.
+   ⚠️ E O QUE ELA CUSTA CAIU PELA METADE: o teto por semana era 14 doces + 200 moedas (🪙 4.400 em
+   valor de loja, com o doce a 300) e passou a ser 5 doces + 525 moedas (🪙 2.025) -- ver o
+   docs/ilhas-laranja.md, que traz a conta. O doce so sai pro 1o lugar agora.
+   ⚠️ E A NOTA DA TELA TEM QUE ACOMPANHAR: o `notaDoPremioSemanal` do index.html prometia "Doces
+   Raros" pros tres degraus, e com esta tabela isso seria texto de premio que mente -- a familia
+   que este projeto mais paga. Ele tem uma copia desta tabela (`RANK_PREMIOS_TELA`) e ha trava
+   comparando as duas, no molde do `MOEDA_MODO_DIFICIL`. */
 const RANK_SEMANAL_PREMIOS = [
-  { doces: 2, moedas: 0,  rotulo: 'líder da semana' },
-  { doces: 1, moedas: 0,  rotulo: 'vice-líder da semana' },
-  { doces: 0, moedas: 50, rotulo: '3º colocado da semana' }
+  { doces: 1, moedas: 0,  rotulo: 'líder da semana' },
+  { doces: 0, moedas: 75, rotulo: 'vice-líder da semana' },
+  { doces: 0, moedas: 30, rotulo: '3º colocado da semana' }
 ];
+/* quantos nomes o resumo da semana guarda por degrau -- ver o `resumo_<campo>` no fechamento */
+const RANK_RESUMO_MAX_NOMES = 5;
 /* ⚠️ A SEMANA COMECA NA SEGUNDA 00:00 NO FUSO DO JOGO, e o id dela e a data dessa segunda. A conta
    reusa o `trainersLeagueDateStrFromTime` / `trainersLeagueTimeOnDate`: uma segunda regra de data
    (a minha, em UTC) discordaria da do jogo em algum fuso, e ai a virada da semana aconteceria numa
@@ -6159,7 +6206,22 @@ async function fecharSemanaDoRanking(base, semanaId, campo, maiorEMelhor, rotulo
     .sort((a, b) => maiorEMelhor ? b - a : a - b)
     .slice(0, RANK_SEMANAL_PREMIOS.length);
   const premiados = todos.filter(x => valores.indexOf(Number(x[campo])) >= 0);
-  await semRef.set({ ['podium_' + campo]: valores, closedAt: Date.now() }, { merge: true });
+  /* ⚠️ O RESUMO COM OS NOMES (27/09/2026) e o que o popup do fim de semana le -- o `podium_` sozinho
+     e uma lista de PLACARES, e um popup que diz "900, 700, 500" sem dizer QUEM nao anuncia nada.
+     ⚠️ ELE E ESCRITO NA MESMA GRAVACAO DO PODIO, ou seja ANTES de pagar e antes do `awarded`: o
+     laco de pagamento pode estourar no meio, e a volta seguinte do cron so refaz o que faltou --
+     escrito depois, uma semana meio-paga ficaria sem resumo pra sempre.
+     ⚠️ E O `total` E QUEM DIVIDE O DEGRAU, nao o tamanho da lista: o podio e de PLACAR DISTINTO,
+     entao um degrau pode ter dez empatados, e a tela precisa dizer "e mais N" em vez de cortar em
+     silencio. Os nomes vao ORDENADOS pra o corte ser o mesmo em toda leitura -- sem isso ele
+     dependeria da ordem em que o Firestore devolveu os documentos. */
+  const resumo = valores.map((v, i) => {
+    const nomes = todos.filter(x => Number(x[campo]) === v)
+      .map(x => String(x.nome || '').trim()).filter(Boolean).sort();
+    return { pos: i + 1, valor: v, total: nomes.length, nomes: nomes.slice(0, RANK_RESUMO_MAX_NOMES) };
+  });
+  await semRef.set({ ['podium_' + campo]: valores, ['resumo_' + campo]: resumo,
+                     closedAt: Date.now() }, { merge: true });
   for(const p of premiados){
     const v = Number(p[campo]);
     const pos = valores.indexOf(v) + 1;
@@ -6217,6 +6279,60 @@ const RANKS_SEMANAIS = [
      pra copiar -- ver a razao la, que e a mesma pela qual a tela dela nao tem aba. */
   { base: 'arenaRanking',   campo: 'nivel',  maior: true,  rotulo: 'Arena 1x1', unidade: 'nivel' }
 ];
+/* ============================================================================
+   O POPUP DO FIM DA SEMANA DAS ILHAS (27/09/2026, a pedido: *"quando zerar, exibir um popup
+   indicando o top 3 de cada modo das ilhas laranjas essa semana, somente para a primeira vez que o
+   usuario ver essa tela, depois nao precisa mais exibir"*).
+
+   ⚠️ A SEMANA QUE ELE MOSTRA E A ANTERIOR, nunca a corrente: e a que ACABOU de fechar. Mostrar a
+   corrente seria anunciar um podio que ainda muda -- e o cron so paga a anterior, pela mesma razao.
+
+   ⚠️ E ELE SO MOSTRA O QUE JA FOI PAGO (a marca `awarded_<campo>`). A semana vira a meia-noite de
+   segunda e o cron passa de hora em hora, entao ha uma janela de ate uma hora em que a semana
+   acabou e o premio ainda nao saiu. Anunciar o podio ali seria anunciar um resultado antes de
+   pagar -- e se o fechamento mudasse alguma coisa (um placar que chegou atrasado), o popup teria
+   mentido. Sem marca ele devolve vazio, o cliente NAO marca, e o jogador ve na proxima entrada.
+
+   ⚠️ A MARCA DE "JA VI" E DA CONTA e e o `semanaId`, nunca um booleano: com um booleano este seria
+   o unico resumo da vida do jogador -- o da semana seguinte nao teria como aparecer. E a mesma
+   licao do `novidadeVista`, que este arquivo ja pagou.
+
+   ⚠️ E QUEM MARCA E O CLIENTE, como no `novidadeVista`: o campo e registro de LEITURA e nao poder
+   de compra, entao ele continua LIVRE pro dono no firestore.rules -- nao houve uma linha a mexer
+   la. Aqui a marca so e LIDA, pra a resposta poder ser curta (1 leitura) pra quem ja viu.
+
+   ⚠️ O CONVIDADO PASSA, de proposito: ele joga as Ilhas (as seis portas abriram em 21/09 e a
+   travessia em 23/09), entao ele pode estar no podio. Ela so LE.
+   ============================================================================ */
+exports.getIslandsWeeklyPodium = onCall(async (request) => {
+  const uid = request.auth && request.auth.uid;
+  if(!uid) throw new HttpsError('unauthenticated', 'Faça login.');
+
+  const semanaId = semanaMaisDias(semanaDoRanking(), -7);
+  /* ⚠️ A SAIDA CURTA VEM PRIMEIRO: quem ja viu custa UMA leitura, e essa e a maioria esmagadora das
+     chamadas -- o popup e uma vez por semana e a tela das Ilhas se abre varias vezes por visita. */
+  const conta = await db.collection('users').doc(uid).get();
+  if(conta.exists && (conta.data() || {}).ilhasResumoVisto === semanaId) return { semanaId, visto: true };
+
+  /* as `RANKS_SEMANAIS` sao cinco pódios em QUATRO documentos (a Corrida tem duas modalidades no
+     mesmo doc), entao o cache evita ler o da Corrida duas vezes */
+  const docs = {};
+  const podios = [];
+  for(const r of RANKS_SEMANAIS){
+    if(!docs[r.base]) docs[r.base] = await rankSemanaDocRef(r.base, semanaId).get().catch(() => null);
+    const snap = docs[r.base];
+    const d = (snap && snap.exists) ? (snap.data() || {}) : {};
+    if(!d['awarded_' + r.campo]) continue;            // ainda nao fechou: nao anuncia
+    const resumo = d['resumo_' + r.campo];
+    if(!Array.isArray(resumo) || !resumo.length) continue;   // semana vazia nao vira linha
+    podios.push({ rotulo: r.rotulo, unidade: r.unidade || null, maior: !!r.maior, degraus: resumo });
+  }
+  /* ⚠️ SEM PODIO NENHUM ele devolve `pronto:false`, e o cliente NAO marca: pode ser a janela do
+     cron, e nesse caso o resumo aparece na entrada seguinte em vez de se perder. */
+  if(!podios.length) return { semanaId, pronto: false };
+  return { semanaId, pronto: true, podios, premios: RANK_SEMANAL_PREMIOS };
+});
+
 /* ⚠️ VARRE AS ULTIMAS SEMANAS em vez de so a anterior, pela mesma razao da Torre: uma semana que
    nao fecha e um premio que ninguem recebe, e o unico jeito de perceber seria alguem reclamar.
    Da mais VELHA pra a mais nova, pras notificacoes chegarem na ordem em que as semanas passaram. */
@@ -6568,20 +6684,27 @@ exports.adminAddTrainersLeagueRegistration = onCall(async (request) => {
   const alvo = String((request.data || {}).uid || '').trim();
   if(!alvo) throw new HttpsError('invalid-argument', 'Informe o treinador.');
 
-  const dateId = trainersLeagueTodayDateStr();
+  /* ⚠️ O DIA SAI DO `trainersLeagueActiveDateId`, nunca de "hoje": depois da trava das 11h a
+     inscrição é pro dia SEGUINTE, e foi exatamente isso que o painel errou no dia em que subiu. */
+  const dateId = trainersLeagueActiveDateId();
   const agora = Date.now();
   const lockTime = trainersLeagueTimeOnDate(dateId, TRAINERS_LEAGUE_LOCK_HOUR, TRAINERS_LEAGUE_LOCK_MIN);
-  if(agora >= lockTime) throw new HttpsError('failed-precondition', 'As inscricoes de hoje ja se encerraram.');
+  if(agora >= lockTime) throw new HttpsError('failed-precondition', 'As inscrições já se encerraram por hoje.');
+  /* ⚠️ E A SEGUNDA GUARDA FALTAVA INTEIRA: enquanto a liga do dia anterior ainda roda, o jogo não
+     deixa ninguém entrar no dia seguinte -- sem ela o painel criaria um inscrito que o jogador não
+     consegue criar. */
+  if(!await trainersLeaguePrevDayDone(dateId)) throw new HttpsError('failed-precondition',
+    'As inscrições abrem assim que a liga do dia terminar.');
 
   /* ⚠️ O NOME VEM DA CONTA, como na Classica: sem ele a linha do chaveamento sai vazia. */
   const conta = await db.collection('users').doc(alvo).get();
   const cd = conta.exists ? (conta.data() || {}) : {};
   const nome = String(cd.trainerName || '').trim();
-  if(!nome) throw new HttpsError('failed-precondition', 'Esse treinador nao tem nome definido.');
+  if(!nome) throw new HttpsError('failed-precondition', 'Esse treinador não tem nome definido.');
 
   const codes = await trainersLeagueGatherEligibleCodesForUid(alvo);
   if(!codes.length) throw new HttpsError('failed-precondition',
-    'Esse treinador nao tem nenhum time com as 8 insignias (ou todos estao aposentados).');
+    'Esse treinador não tem nenhum time com as 8 insígnias (ou todos estão aposentados).');
 
   await trainersLeagueEnsureCycleDoc(dateId);
   /* ⚠️ E O STATUS DO CICLO E CONFERIDO DEPOIS DE GARANTIR QUE ELE EXISTE: so `registering` aceita
@@ -6589,12 +6712,12 @@ exports.adminAddTrainersLeagueRegistration = onCall(async (request) => {
   const cicloSnap = await trainersLeagueCycleRef(dateId).get();
   const st = cicloSnap.exists ? (cicloSnap.data() || {}).status : null;
   if(st && st !== 'registering') throw new HttpsError('failed-precondition',
-    'A liga de hoje ja saiu da fase de inscricoes (' + st + ').');
+    'A liga desse dia já saiu da fase de inscrições (' + st + ').');
 
   const ref = trainersLeagueRegistrantRef(dateId, alvo);
   await db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
-    if(snap.exists) throw new HttpsError('already-exists', 'Esse treinador ja esta inscrito na Trainers League de hoje.');
+    if(snap.exists) throw new HttpsError('already-exists', 'Esse treinador já está inscrito na Trainers League desse dia.');
     /* ⚠️ OS CAMPOS SAO OS MESMOS QUE O JOGADOR GRAVA, um a um -- inclusive as especialidades
        CONGELADAS: a liga do dia roda com o numero da hora da inscricao, entao subir de especialista
        no meio do campeonato nao muda partidas ja agendadas. */

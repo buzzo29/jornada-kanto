@@ -2402,6 +2402,58 @@ Enfiar as duas na mesma função daria um corpo com dois caminhos que não compa
 - **⚠️ AS DUAS GUARDAS DE JANELA SÃO AS MESMAS DO JOGADOR**, e são o que impede o painel de criar
   um estado que o jogo não cria: depois do `lockTime` o chaveamento já foi montado, e um ciclo fora
   de `registering` já saiu da fase de inscrições.
+
+### ⚠️ E ELAS **NÃO** ERAM AS MESMAS — o defeito que subiu junto, relatado no mesmo dia
+
+Reportado assim, horas depois do deploy: *"quando eu tento me inscrever na trainers league através
+do admin-treinadores, fica exibindo a mensagem: 'As inscrições de hoje já se encerraram', sendo que
+pelo jogo, dá para se inscrever normalmente"*.
+
+**⚠️ EU REESCREVI A REGRA DE DATA EM VEZ DE REUSÁ-LA** — e o item logo acima prometia o contrário
+com todas as letras. A callable fixou `trainersLeagueTodayDateStr()` e conferiu a trava das **11h
+de HOJE**; o jogo usa o **`trainersLeagueActiveDateId()`**, que depois das 11h manda a inscrição
+pra **AMANHÃ**:
+
+| hora no fuso do jogo | o jogo inscreve pra | a callable fazia |
+|---|---|---|
+| 08:00 (antes da trava) | **hoje** | hoje ✓ — **concorda por acaso** |
+| 20:24 (a hora do relato) | **amanhã** | hoje → **recusa tudo** |
+
+**⚠️ E FALTAVA A SEGUNDA GUARDA INTEIRA:** o `trainersLeaguePrevDayDone` — enquanto a liga do dia
+anterior ainda ROLA, o jogo não deixa ninguém entrar no dia seguinte. Sem ela o painel criaria um
+inscrito que o jogador **não consegue criar**.
+
+#### ⚠️ POR QUE A TRAVA PASSOU: ela dependia do RELÓGIO DE PAREDE
+
+As 7 travas rodaram por volta das **10h** no fuso do jogo, e **antes das 11h o "hoje" fixo concorda
+com o dia ativo** — ou seja elas mediram **um ramo só**, e o outro só apareceu em produção. (O
+commit saiu 12h36, já do outro lado da fronteira.)
+
+**A trava nova dubla o `Date.now`** e exercita as **duas metades**: 08:00 → inscreve pra hoje,
+20:24 → inscreve pra amanhã (o caso do relato), e a liga do dia rodando → recusa. As datas são
+fixas de propósito, e não dependem do fuso da máquina (o fuso do jogo é travado no
+`TRAINERS_LEAGUE_TZ_OFFSET` e no `America/Sao_Paulo` do `Intl`).
+
+#### ⚠️ AS DUAS REGRAS VIRARAM CÓPIA, e a cópia tem trava
+
+Elas **nasceram no `index.html`** porque só o cliente inscrevia; o painel foi o primeiro caminho de
+servidor a precisar da mesma resposta. Hoje elas vivem nos dois, e `tools/test-liga-pro.js` compara
+os **corpos** — o molde do `MOEDA_MODO_DIFICIL`. Divergindo, o painel inscreve num dia e o jogo
+noutro, e **o sintoma é mudo**: os dois gravam sem erro.
+
+⚠️ **A única diferença tolerada é o `logger.error` × `console.error`** (o cliente não tem `logger`,
+o servidor não usa `console`) — e a trava normaliza **só** isso. Normalizar mais seria deixar passar
+divergência de REGRA.
+
+#### E O SELO DO PAINEL DEIXOU DE DIZER "de hoje"
+
+Ele dizia *"✅ inscrito na Trainers League **de hoje**"* — e depois das 11h isso é uma data errada.
+Hoje ele diz o **dia** (`dd/mm`). **Foi por escrever "hoje" que a guarda nasceu errada.**
+
+**Conferido: os 2 defeitos religados acusam** (8 e 2 falhas).
+
+⚠️ **E AS MENSAGENS DA CALLABLE GANHARAM ACENTO no mesmo passo:** ela nasceu sem, fora do estilo do
+arquivo — medido, **203 mensagens de `HttpsError` acentuadas contra 25 sem**.
 - **As especialidades entram CONGELADAS**, como na inscrição do jogador: a liga do dia roda com o
   número da hora da inscrição.
 - **O botão só aparece quando há time apto**, pela mesma regra do outro: oferecer uma ação que a
