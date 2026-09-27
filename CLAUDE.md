@@ -204,6 +204,12 @@ subseção e a conta continua fechando.
   vale ×2, então é a correspondência mais provável). Sem isso o selo sumia em **56%** dos confrontos
   com crítico, justamente os longos. O que é aproximado é a POSIÇÃO; o lado e a contagem são reais,
   e o teste cobra os dois.
+- **⚠️ A TABELA DE TIPOS É A DA GEN 3 DESDE 27/09/2026** — ela era uma de **Gen 1** com as duas
+  linhas de Gen 2 parafusadas. Varridas as **289** relações contra o dado do Showdown, quatro
+  divergiam: Veneno→Inseto (2×→1×), Inseto→Veneno (2×→0,5×), Gelo→Fogo (1×→0,5×) e
+  **Elétrico→Aço (0,5×→1×, que não era valor de geração nenhuma)**. E o `SPECIAL_TYPES` eram os
+  SETE da Gen 1: **o Sombrio entrou**, e ele alcança 54 das 250 espécies. Ver **O MOTOR VIROU GEN 3
+  DE VERDADE** em `docs/motor-de-batalha.md`.
 - **Multiplicador de tipo: expoente 1.0** (`EXPOENTE_TIPO`), ou seja, a tabela oficial — 2× é 2×.
   Ele já foi `0.6` (comprimido: 2× virava 1,52×), pra tipo não virar sentença de morte num jogo
   onde não dá pra trocar de pokémon no meio do confronto. Voltou pra 1.0 em 30/08/2026, medido:
@@ -341,11 +347,13 @@ subseção e a conta continua fechando.
   O pool da Torre (evoluções finais) foi de 81 pra **143**.
 - Números reconstruídos dos dados do Pokémon Showdown aplicando os mods gen8→gen2 sobre os valores
   atuais. **Método conferido: bate 150/150 com o `GEN2_SPECIAL` de Kanto que já estava aqui.**
-- **Sombrio e Aço entraram no `TYPE_CHART`**, com os valores da Gen 2 (o Aço ainda resiste a
-  Fantasma e a Sombrio — isso só mudou na Gen 6). Acrescentar tipo NOVO não mexeu em nada do que
-  já existia: nenhuma das 150 de Kanto é Sombrio ou Aço (o jogo usa a tipagem da Gen 1, então
-  Magnemite e Magneton seguem só Elétrico), então toda linha nova só entra em confronto que
-  envolve um pokémon de Johto. **Conferido: a impressão do motor não mudou.**
+- **Sombrio e Aço entraram no `TYPE_CHART`** em 30/08/2026, com os valores da Gen 2 (o Aço ainda
+  resiste a Fantasma e a Sombrio — isso só mudou na Gen 6). Acrescentar tipo NOVO não mexeu em nada
+  do que já existia, então toda linha nova só entra em confronto que envolve um pokémon de Johto.
+  **Conferido: a impressão do motor não mudou.**
+  ⚠️ **E ESTE ITEM DIZIA QUE "Magnemite e Magneton seguem só Elétrico" — isso ACABOU em 27/09/2026**,
+  junto com a tabela inteira virando Gen 3: os dois são **Elétrico/Aço**. Ver **O MOTOR VIROU GEN 3
+  DE VERDADE** em `docs/motor-de-batalha.md`, que traz as quatro frentes e o que cada uma custou.
 - **As três evoluções em conflito ficaram de fora**: Gloom, Poliwhirl e Slowpoke continuam virando
   Vileplume, Poliwrath e Slowbro. A tabela mapeia um destino só, e a chave repetida faria o segundo
   apagar o primeiro em silêncio.
@@ -1651,7 +1659,7 @@ de revelação** e o que cada um pinta.
 **⚠️ E ESTES SÍMBOLOS SÓ SÃO EXPLICADOS LÁ** — um `grep` que caia aqui e não ache nada tem que
 ir pro capítulo, e é essa lista que faz o gatilho valer quando o assunto não é óbvio:
 
-`index.html` · `fighterHtml` · `passosVisiveis` · `crispEdges` · `simulateGymBattle` · `innerHTML` · `MORIBUNDO_TETO_NO_CHEIO` · `TETO_GOLPES` · `terrainBattleSceneStyle` · `doExchange` · `sequenciaDoConfronto` · `fraseDoEspecial` · `encerrarBatalha` · `passosDaAbertura` · `DESENHOS` · `virarMatchup` · `preservePlayerHp` · `currentColor` · `SONO_EM_TROCAS` · `buildAnimatedHitSequence` · `ORCAMENTO_ANIM_ONLINE_MS` · `logDaMinhaVista` · `pausaDaFaixa` · `obsDoGolpe` · `abrirConfronto` · `spriteComStatusHtml` · `CRIT_BASE` · `applyTerrainBuff` · `m.chuva` · `lastCrit` · `moveTeam` · `ehGolpeEspecial` · `passosHtml` · `Math.random`
+`PRIORIDADE` · `prioridadeNaTroca` · `SPECIAL_TYPES` · `TYPE_CHART` · `withEstagio` · `index.html` · `fighterHtml` · `passosVisiveis` · `crispEdges` · `simulateGymBattle` · `innerHTML` · `MORIBUNDO_TETO_NO_CHEIO` · `TETO_GOLPES` · `terrainBattleSceneStyle` · `doExchange` · `sequenciaDoConfronto` · `fraseDoEspecial` · `encerrarBatalha` · `passosDaAbertura` · `DESENHOS` · `virarMatchup` · `preservePlayerHp` · `currentColor` · `SONO_EM_TROCAS` · `buildAnimatedHitSequence` · `ORCAMENTO_ANIM_ONLINE_MS` · `logDaMinhaVista` · `pausaDaFaixa` · `obsDoGolpe` · `abrirConfronto` · `spriteComStatusHtml` · `CRIT_BASE` · `applyTerrainBuff` · `m.chuva` · `lastCrit` · `moveTeam` · `ehGolpeEspecial` · `passosHtml` · `Math.random`
 
 *(4 seções, 118 subseções, 238 KB — saíram daqui em 25/09/2026 porque o CLAUDE.md é lido
 INTEIRO em toda sessão, e ele tinha chegado a 1.360 KB.)*

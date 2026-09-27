@@ -2244,8 +2244,29 @@ console.log('\n=== O GOLPE APARADO NAO APARECE COM O NUMERO APARADO ===');
      defeito de verdade e esta registrado no CLAUDE.md como achado e nao mexido. O `n` e o do GRUPO
      QUE A SUAVIZACAO REPARTIU (`g2cru`), nao o do que a trava mede: o critico e o golpe final
      entram no rateio e deslocam os outros, mesmo saindo da conta. */
-  const tolDoGrupo = (n) => Math.max(1.25,
-      (1 + Math.sqrt(Math.max(1, n - 1)) * JITTER_APARO) / (1 - JITTER_APARO));
+  /* ⚠️ A TOLERANCIA PRECISA DA ESCALA GEN 1, e nao so do tamanho do grupo (27/09/2026). O dano e
+     calculado em numeros PEQUENOS (a escala Gen 1) e so depois projetado na barra grande: um golpe
+     que aparece como 25 na tela vale ~8 la dentro, e um `round` sobre 8 e +-6%. Somado a variacao
+     de 0,85 a 1,00 (1,176x), o maximo PRODUZIVEL num golpe de 8 e 1,33x -- acima do piso de 1,25
+     que esta trava usava.
+     Foi exatamente esse o caso que ela acusou quando a tabela de tipos virou Gen 3 e a semente
+     mudou: Chansey x Phanpy, Bomba-Ovo de 25 e 32 (razao 1,28) num dmgGen1 de ~8. O motor estava
+     certo; a conta da trava e que ignorava o arredondamento de onde a conta acontece.
+     ⚠️ E O PISO DE 1,25 FICA pros golpes grandes, onde o arredondamento nao pesa. */
+  /* ⚠️ SAO DOIS ARREDONDAMENTOS, nao um -- e contar so o primeiro deixou a conta 0,6% curta (o
+     Sneasel x Slowbro de 43 e 54, com tol 1,249 contra razao 1,256). O motor arredonda DUAS vezes:
+       1) `dmgGen1 = round(core * ... * (0,85 + rng*0,15))`  -- na escala Gen 1, numeros pequenos
+       2) `d = round(pct * maxHp)`                            -- ao projetar na barra grande
+     Cada uma vale +-0,5, e a segunda pesa pouco porque `d` e grande -- mas ela EXISTE, e e o que
+     faltava. Os dois fatores sao lidos do CODIGO, nao ajustados ate passar. */
+  const tolDoArredondamento = (g1, d) => {
+    const um  = (!g1 || g1 < 1.5) ? 1 : (g1 + 0.5) / (g1 - 0.5);
+    const doi = (!d  || d  < 1.5) ? 1 : (d  + 0.5) / (d  - 0.5);
+    return 1.176 * um * doi;      // 1,176 = a variacao de 0,85 a 1,00
+  };
+  const tolDoGrupo = (n, g1min, dmin) => Math.max(1.25,
+      (1 + Math.sqrt(Math.max(1, n - 1)) * JITTER_APARO) / (1 - JITTER_APARO),
+      tolDoArredondamento(g1min, dmin));
   ok('  e a tolerancia do arredondamento cresce com o grupo', tolDoGrupo(2) < tolDoGrupo(9),
      'par ' + tolDoGrupo(2).toFixed(2) + 'x  ->  grupo de 9 ' + tolDoGrupo(9).toFixed(2) + 'x');
   const todos = Object.keys(S.SPECIES);
@@ -2256,7 +2277,12 @@ console.log('\n=== O GOLPE APARADO NAO APARECE COM O NUMERO APARADO ===');
      ~1.700 pra 1.407 e o limiar de 1.500 passou a falhar sem nada estar errado. */
   for(let i = 0; i < 1700; i++){
     const t = k => { const p = inst(todos[(i*11 + k*37) % todos.length], 40 + (k%3)*5); p.ataques = S.ataquesPadrao(p); return p; };
-    const ms = S.simulateGymBattle([t(0),t(1),t(2)], [t(3),t(4),t(5)], S.makeSeededRng('aparo' + i)).matchups || [];
+    /* ⚠️ AS INSTANCIAS FICAM GUARDADAS POR NOME: a tolerancia precisa do `gen1MaxHp` do ALVO, e o
+       matchup so traz o nome e o maxHp da barra. Sem isso a trava nao tem como saber em que escala
+       o arredondamento aconteceu -- ver o tolDoArredondamento. */
+    const elenco = [t(0),t(1),t(2),t(3),t(4),t(5)];
+    const porNome = {}; elenco.forEach(p => { porNome[p.name] = p; });
+    const ms = S.simulateGymBattle(elenco.slice(0,3), elenco.slice(3), S.makeSeededRng('aparo' + i)).matchups || [];
     ms.forEach(mm => {
       conf++;
       const seq = S.sequenciaDoConfronto(mm);
@@ -2363,7 +2389,19 @@ console.log('\n=== O GOLPE APARADO NAO APARECE COM O NUMERO APARADO ===');
            do `tolDoGrupo`, la em cima. O que a trava existe pra pegar e a faixa REABRINDO e o
            Rolamento pos-reset: ali a razao volta pras dezenas, muito acima de qualquer tolerancia.
            ⚠️ O `n` E O DO GRUPO REPARTIDO (`g2cru`), nao o do medido. */
-        if(r > tolDoGrupo(g2cru.length)){ fora++; if(r > pior){ pior = r; exemplo = mm.player + ' x ' + mm.enemy + ': ' + g2.map(g => g.d + (g.rl > 1 ? '(x' + g.rl + ')' : '')).join(' e '); } }
+        /* o menor dano do grupo, convertido pra escala em que a conta acontece */
+        const alvoInst = porNome[lado === 'p' ? mm.enemy : mm.player];
+        const maxAlvo = lado === 'p' ? mm.enemyMaxHp : mm.playerMaxHp;
+        const escala = (alvoInst && maxAlvo) ? S.gen1MaxHp(alvoInst) / maxAlvo : 0;
+        const dmin = Math.min.apply(null, g2.map(g => g.d / (g.rl || 1)));
+        const g1min = escala ? dmin * escala : 0;
+        /* ⚠️ A MENSAGEM DIZ A TOLERANCIA E A ESCALA, e nao so a razao: "1.3x" sozinho nao deixa
+           separar "o motor errou" de "a trava e apertada demais pra esse tamanho de golpe", e foi
+           exatamente essa a duvida que custou uma investigacao em 27/09/2026. */
+        const tol = tolDoGrupo(g2cru.length, g1min, dmin);
+        if(r > tol){ fora++; if(r > pior){ pior = r; exemplo = mm.player + ' x ' + mm.enemy + ': '
+          + g2.map(g => g.d + (g.rl > 1 ? '(x' + g.rl + ')' : '')).join(' e ')
+          + '  [tol ' + tol.toFixed(3) + ', g1min ' + (g1min || 0).toFixed(1) + ', n ' + g2cru.length + ']'; } }
       });
     });
   }
@@ -5983,8 +6021,17 @@ console.log('\n=== AS DUAS FRASES NOVAS: acordou e chuva terminou ===');
              que a regra promete e que ele nao acorda ANTES DA VEZ DELE, nao que alguem bateu nele.
              Sem isso a trava acusava 13 de 200 com o motor certo, e o exemplo era literal:
              p124, e76, SONO, SONO, DORMINDO, acordou. */
+          /* ⚠️ E O `confuso` ENTROU EM 27/09/2026 -- a QUARTA vez que esta trava mede a
+             CIRCUNSTANCIA em vez da regra (as tres anteriores estao nos comentarios acima: o sono
+             de 1 a 3 trocas, a paralisia, e o sono herdado).
+             O caso: quem dormiu o alvo ficou CONFUSO e se acertou na troca seguinte -- entao
+             ninguem bateu no adormecido e nao saiu `dormindo` nenhum, e a trava leu isso como
+             "ele acordou antes da vez dele". Nao acordou: a TROCA passou, e a linha da confusao e
+             a prova dela. A regra e "ele nao acorda antes da vez dele", e uma troca em que o
+             atacante se acertou continua sendo uma troca.
+             Medido: 1 de 200, com o motor certo. */
           const travouReal = seq.some((g, k) => k > inicio && k < jA &&
-            (g.x === 'paralisado' || g.x === 'gelado' || g.x === 'dormindo'));
+            (g.x === 'paralisado' || g.x === 'gelado' || g.x === 'dormindo' || g.x === 'confuso'));
           if(!(travouReal || (jGreal >= 0 && jGreal < jA))){ fora++; if(!exemplo) exemplo = seq.map(g => g.x || (g.q + g.d)).join(','); }
         });
       }
@@ -10654,6 +10701,104 @@ console.log('\n=== A VELOCIDADE ESCALA COM O NÍVEL (a fórmula da Gen 3) ===');
     ok('  (o crítico de verdade só olha o golpe)', S.chanceDeCritico('tackle') === S.CRIT_BASE &&
        S.chanceDeCritico('slash') === S.CRIT_ALTO);
   }
+}
+
+
+console.log('=== O SOMBRIO E ESPECIAL, O CRITICO IGNORA ESTAGIO, E A PRIORIDADE EXISTE (27/09/2026) ===');
+{
+  const _fsT = require('fs'), _pT = require('path');
+  const HTML = _fsT.readFileSync(_pT.join(__dirname, '..', 'index.html'), 'utf8');
+  const SRV = _fsT.readFileSync(_pT.join(__dirname, '..', 'functions', 'index.js'), 'utf8');
+  /* ⚠️ O SOMBRIO ficava de fora do SPECIAL_TYPES -- residuo de quando Johto chegou: o conjunto
+     eram os SETE da Gen 1, e a divisao fisico/especial por TIPO da Gen 2/3 tem OITO. Sem ele,
+     Mordida e Triturar saiam de Ataque/Defesa, e isso alcanca 54 das 250 especies (22%). */
+  ok('o Sombrio e ESPECIAL', S.isSpecialType('Dark') === true);
+  ok('  e o Aco continua FISICO (ele nao entrou junto, e esta certo)', S.isSpecialType('Steel') === false);
+  ok('  e os oito sao exatamente os da Gen 2/3',
+     ['Fire','Water','Grass','Electric','Psychic','Ice','Dragon','Dark'].every(t => S.isSpecialType(t))
+     && ['Normal','Fighting','Poison','Ground','Flying','Bug','Rock','Ghost','Steel'].every(t => !S.isSpecialType(t)));
+  /* ⚠️ E A PROVA DE QUE ISSO CHEGA AO DANO: um Sneasel (Atk 95, SpAtk 35) tem que bater MENOS
+     com Mordida do que bateria pelo Ataque. Ler so o conjunto passaria com o motor ignorando. */
+  {
+    const a = S.createInstance('sneasel', 50); a.ataques = ['bite'];
+    const b = S.createInstance('snorlax', 50);
+    const m = S.melhorAtaque(a, b);
+    ok('  e o golpe Sombrio usa o Sp.Atk no dano (nao o Ataque)',
+       !!m && S.isSpecialType(m.type) === true, m ? m.type : '(sem golpe)');
+  }
+
+  /* ⚠️ O CRITICO DA GEN 3 ignora o estagio que ATRAPALHA e mantem o que AJUDA. */
+  {
+    const p = S.createInstance('machamp', 50);
+    const base = S.effectiveAttack(p);
+    p._estagios = { atk: -2 };
+    ok('o critico IGNORA o estagio negativo do atacante', S.effectiveAttack(p, 'atacante') === base,
+       S.effectiveAttack(p, 'atacante') + ' x ' + base);
+    ok('  e sem crit o -2 continua valendo', S.effectiveAttack(p) < base, String(S.effectiveAttack(p)));
+    p._estagios = { atk: 2 };
+    ok('  e o POSITIVO o critico MANTEM', S.effectiveAttack(p, 'atacante') > base);
+    const d = S.createInstance('snorlax', 50);
+    const db = S.effectiveDefense(d);
+    d._estagios = { def: 2 };
+    ok('o critico IGNORA o estagio positivo da defesa', S.effectiveDefense(d, 'defensor') === db);
+    d._estagios = { def: -2 };
+    ok('  e o NEGATIVO da defesa ele MANTEM', S.effectiveDefense(d, 'defensor') < db);
+  }
+  /* ⚠️ E O isCrit TEM QUE SER DECIDIDO ANTES DOS ATRIBUTOS, senao a regra acima nao alcanca o
+     dano -- e o teste de comportamento acima passaria mesmo com o motor ignorando. Sem rng()
+     nenhum entre um ponto e outro: e isso que mantem os dois motores na mesma semente. */
+  for(const [nome, txt] of [['cliente', HTML], ['servidor', SRV]]){
+    const j = txt.indexOf('const isCrit = (rng() < chanceDeCritico');
+    const k = txt.indexOf('const atkBase = special ?', j - 2000);
+    ok('  o isCrit vem ANTES do atkBase no ' + nome, j > 0 && k > j, 'isCrit ' + j + ' < atkBase ' + k);
+    ok('    e o atkBase recebe o crit no ' + nome,
+       txt.indexOf("effectiveAttack(attacker, isCrit && 'atacante')") > 0
+       && txt.indexOf("effectiveDefense(defender, isCrit && 'defensor')") > 0);
+  }
+
+  /* ⚠️ A PRIORIDADE: ate 27/09 a ordem do turno era so VELOCIDADE. */
+  ok('a tabela de prioridade tem os golpes de DANO da Gen 3',
+     JSON.stringify(Object.keys(S.PRIORIDADE).sort()) ===
+     JSON.stringify(['extremespeed','fakeout','machpunch','quickattack','vitalthrow']),
+     JSON.stringify(Object.keys(S.PRIORIDADE).sort()));
+  ok('  o Ataque Rapido tem +1 e o Arremesso Vital -1',
+     S.prioridadeDoGolpe('quickattack') === 1 && S.prioridadeDoGolpe('vitalthrow') === -1);
+  ok('  e um golpe comum tem 0', S.prioridadeDoGolpe('tackle') === 0);
+  /* ⚠️ O QUE IMPORTA E ELA GANHAR DA VELOCIDADE: o Tyrogue (vel 40) tem que bater antes do
+     Jolteon (vel 135). Sem isso a tabela e decoracao. */
+  {
+    const t = S.createInstance('tyrogue', 50); t.ataques = S.ataquesPadrao(t);
+    const j = S.createInstance('jolteon', 50); j.ataques = S.ataquesPadrao(j);
+    ok('  o lento COM prioridade a tem, e o rapido SEM prioridade nao',
+       S.prioridadeNaTroca(t, j) === 1 && S.prioridadeNaTroca(j, t) === 0,
+       S.prioridadeNaTroca(t, j) + ' x ' + S.prioridadeNaTroca(j, t));
+    ok('    (e o lento e mesmo o mais lento)', S.effectiveSpeed(t) < S.effectiveSpeed(j),
+       S.effectiveSpeed(t) + ' x ' + S.effectiveSpeed(j));
+  }
+  /* ⚠️ E ELA SO LE O `melhorAtaque` DE QUEM CARREGA UM: a guarda e o que paga a conta (94% das
+     especies nao tem nenhum). Sem ela sao dois melhorAtaque a mais por troca, no caminho quente. */
+  {
+    const sem = S.createInstance('snorlax', 50); sem.ataques = ['tackle','bodyslam'];
+    ok('  quem NAO carrega prioridade devolve 0 sem consultar o golpe',
+       S.prioridadeNaTroca(sem, S.createInstance('pidgey', 50)) === 0);
+  }
+  /* ⚠️ E A ORDEM DO TURNO TEM QUE LE-LA -- os casos acima chamam a funcao na mao e passariam com
+     a chamada orfa. E a mesma trava que o applySpecialtyBuff e o equiparItens ja tem. */
+  for(const [nome, txt] of [['cliente', HTML], ['servidor', SRV]]){
+    const j = txt.indexOf('const activeFirst =');
+    const fatia = txt.slice(j - 900, j + 300);
+    ok('  o activeFirst le a prioridade no ' + nome,
+       /prioActive !== prioEnemy/.test(fatia) && /prioridadeNaTroca\(active, enemy\)/.test(fatia));
+    ok('    e ela vem ANTES da velocidade na decisao no ' + nome,
+       fatia.indexOf('prioActive !== prioEnemy') < fatia.indexOf('spdActive > spdEnemy'));
+  }
+  /* ⚠️ E AS TRES TABELAS SAO IGUAIS NOS DOIS MOTORES: divergindo, a mesma partida de liga termina
+     diferente no cliente e no servidor. */
+  const pedaco = (txt, nome, fecha) => { const a = txt.indexOf('const ' + nome + ' = ');
+    return a < 0 ? null : txt.slice(a, txt.indexOf(fecha, a) + fecha.length).replace(/\s+/g, ' '); };
+  for(const [nome, fecha] of [['PRIORIDADE', '};'], ['SPECIAL_TYPES', ');']])
+    ok('  ' + nome + ' e IGUAL nos dois motores',
+       pedaco(HTML, nome, fecha) && pedaco(HTML, nome, fecha) === pedaco(SRV, nome, fecha));
 }
 
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');

@@ -867,5 +867,89 @@ console.log('\nCENA DE BATALHA -- a chuva segue a Danca da Chuva');
      casos + ' batalhas cortadas com chuva no ar');
 }
 
+
+/* ⚠️ AS DUAS COPIAS DO MOTOR, avaliadas do arquivo: o TYPE_CHART e o SPECIES sao duplicados, e
+   uma divergencia neles faz a MESMA batalha terminar diferente no cliente e no servidor. */
+const NL = String.fromCharCode(10);
+const objDoServidor = (nome) => {
+  const t = fs.readFileSync(path.join(__dirname, '..', 'functions', 'index.js'), 'utf8');
+  const i = t.indexOf('const ' + nome + ' = {');
+  return (new Function('return ' + t.slice(t.indexOf('{', i), t.indexOf(NL + '};', i) + 2)))();
+};
+const SRV_TYPE_CHART = objDoServidor('TYPE_CHART');
+const SRV_SPECIES = objDoServidor('SPECIES');
+
+console.log('\n=== A TABELA DE TIPOS E A DA GEN 3 (27/09/2026) ===');
+{
+  /* ⚠️ A REFERENCIA MORA AQUI, e isso e o ponto da trava: ela e a afirmacao INDEPENDENTE do que a
+     Gen 3 diz, tirada do dado do Pokemon Showdown (a tabela moderna + o mod da gen5, que e o
+     ultimo antes de a Fada existir -- entre a Gen 3 e a Gen 5 a tabela nao mudou). Comparar o
+     TYPE_CHART com ele mesmo nao prova nada; comparar com isto prova.
+     ⚠️ E ELA VARRE AS 289, nao as quatro que alguem apontou: a tabela era uma de GEN 1 com duas
+     linhas de Gen 2 parafusadas, e so a varredura provou que eram exatamente quatro as erradas
+     (Veneno>Inseto, Inseto>Veneno, Gelo>Fogo e Eletrico>Aco). Conferir "as que apontaram" nao
+     prova que sao essas. */
+  const GEN3 = [
+  'Normal>Rock=0.5 Normal>Ghost=0 Normal>Steel=0.5 Fire>Fire=0.5 Fire>Water=0.5 Fire>Grass=2',
+  'Fire>Ice=2 Fire>Bug=2 Fire>Rock=0.5 Fire>Dragon=0.5 Fire>Steel=2 Water>Fire=2',
+  'Water>Water=0.5 Water>Grass=0.5 Water>Ground=2 Water>Rock=2 Water>Dragon=0.5 Grass>Fire=0.5',
+  'Grass>Water=2 Grass>Grass=0.5 Grass>Poison=0.5 Grass>Ground=2 Grass>Flying=0.5 Grass>Bug=0.5',
+  'Grass>Rock=2 Grass>Dragon=0.5 Grass>Steel=0.5 Electric>Water=2 Electric>Grass=0.5',
+  'Electric>Electric=0.5 Electric>Ground=0 Electric>Flying=2 Electric>Dragon=0.5 Ice>Fire=0.5',
+  'Ice>Water=0.5 Ice>Grass=2 Ice>Ice=0.5 Ice>Ground=2 Ice>Flying=2 Ice>Dragon=2 Ice>Steel=0.5',
+  'Fighting>Normal=2 Fighting>Ice=2 Fighting>Poison=0.5 Fighting>Flying=0.5',
+  'Fighting>Psychic=0.5 Fighting>Bug=0.5 Fighting>Rock=2 Fighting>Ghost=0 Fighting>Dark=2',
+  'Fighting>Steel=2 Poison>Grass=2 Poison>Poison=0.5 Poison>Ground=0.5 Poison>Rock=0.5',
+  'Poison>Ghost=0.5 Poison>Steel=0 Ground>Fire=2 Ground>Grass=0.5 Ground>Electric=2',
+  'Ground>Poison=2 Ground>Flying=0 Ground>Bug=0.5 Ground>Rock=2 Ground>Steel=2 Flying>Grass=2',
+  'Flying>Electric=0.5 Flying>Fighting=2 Flying>Bug=2 Flying>Rock=0.5 Flying>Steel=0.5',
+  'Psychic>Fighting=2 Psychic>Poison=2 Psychic>Psychic=0.5 Psychic>Dark=0 Psychic>Steel=0.5',
+  'Bug>Fire=0.5 Bug>Grass=2 Bug>Fighting=0.5 Bug>Poison=0.5 Bug>Flying=0.5 Bug>Psychic=2',
+  'Bug>Ghost=0.5 Bug>Dark=2 Bug>Steel=0.5 Rock>Fire=2 Rock>Ice=2 Rock>Fighting=0.5',
+  'Rock>Ground=0.5 Rock>Flying=2 Rock>Bug=2 Rock>Steel=0.5 Ghost>Normal=0 Ghost>Psychic=2',
+  'Ghost>Ghost=2 Ghost>Dark=0.5 Ghost>Steel=0.5 Dragon>Dragon=2 Dragon>Steel=0.5',
+  'Dark>Fighting=0.5 Dark>Psychic=2 Dark>Ghost=2 Dark>Dark=0.5 Dark>Steel=0.5 Steel>Fire=0.5',
+  'Steel>Water=0.5 Steel>Electric=0.5 Steel>Ice=2 Steel>Rock=2 Steel>Steel=0.5',
+  ].join(' ').split(/\s+/).filter(Boolean);
+  const esperado = {};
+  for(const p of GEN3){ const [par, v] = p.split('='); esperado[par] = Number(v); }
+  const TIPOS = ['Normal','Fire','Water','Grass','Electric','Ice','Fighting','Poison','Ground',
+                 'Flying','Psychic','Bug','Rock','Ghost','Dragon','Dark','Steel'];
+  const esp = (a, d) => esperado[a + '>' + d] === undefined ? 1 : esperado[a + '>' + d];
+  for(const [nome, T] of [['cliente', S.TYPE_CHART], ['servidor', SRV_TYPE_CHART]]){
+    const tem = (a, d) => (T[a] && T[a][d] !== undefined) ? T[a][d] : 1;
+    const difs = [];
+    for(const a of TIPOS) for(const d of TIPOS) if(tem(a, d) !== esp(a, d)) difs.push(a + '>' + d + ' ' + tem(a, d) + ' x ' + esp(a, d));
+    ok('as 289 relacoes do ' + nome + ' batem com a Gen 3', difs.length === 0, difs.slice(0, 4).join(' | '));
+  }
+  ok('  (a referencia tem o que comparar)', GEN3.length === 110, GEN3.length + ' relacoes != 1');
+  /* ⚠️ AS QUATRO QUE ERAM GEN 1 GANHAM LINHA PROPRIA: a varredura acima ja as pega, mas uma
+     falha nomeada e o que separa "a tabela mudou" de "voltou justamente a que era Gen 1". */
+  for(const [a, d, v, nota] of [['Poison','Bug',1,'a Gen 2 tirou o 2x'], ['Bug','Poison',0.5,'a Gen 2 inverteu'],
+                                ['Ice','Fire',0.5,'a Gen 2 acrescentou a resistencia'],
+                                ['Electric','Steel',1,'o Aco nunca resistiu a Eletrico, em geracao nenhuma']])
+    ok('  ' + a + ' -> ' + d + ' = ' + v + '  (' + nota + ')',
+       ((S.TYPE_CHART[a] || {})[d] === undefined ? 1 : S.TYPE_CHART[a][d]) === v);
+}
+
+console.log('\n=== A TIPAGEM DAS 250 E A DA GEN 3 ===');
+{
+  /* ⚠️ QUATRO ESPECIES DIVERGIAM, e duas delas nenhuma auditoria tinha apontado -- so a varredura
+     achou. Magnemite/Magneton eram GEN 1 (a Gen 2 lhes deu o Aco); Psyduck/Golduck eram
+     INVENCAO -- eles sao Agua puro em TODA geracao, e o Psiquico deles nao estava registrado em
+     lugar nenhum do projeto. O Psiquico continua saindo, como SUBTIPO (sem STAB), que e o que a
+     tabela de subtipos ja lhes dava. */
+  const GEN3_TIPOS = { magnemite:['Electric','Steel'], magneton:['Electric','Steel'],
+                       psyduck:['Water'], golduck:['Water'] };
+  for(const sp of Object.keys(GEN3_TIPOS))
+    ok('  ' + sp + ' e ' + GEN3_TIPOS[sp].join('/'),
+       JSON.stringify(S.SPECIES[sp].types) === JSON.stringify(GEN3_TIPOS[sp]),
+       JSON.stringify(S.SPECIES[sp].types));
+  /* e as duas copias tem que bater, como toda tabela duplicada deste projeto */
+  const difs = Object.keys(S.SPECIES).filter(sp =>
+    JSON.stringify(S.SPECIES[sp].types) !== JSON.stringify((SRV_SPECIES[sp] || {}).types));
+  ok('  e a tipagem e IGUAL nos dois motores', difs.length === 0, difs.slice(0, 5).join(', '));
+}
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);

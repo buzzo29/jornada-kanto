@@ -3394,3 +3394,170 @@ poder implícito de 60 — um Onix batendo de um golpe de Pedra que ele não apr
   | NPC no motor de tipo (antes) | 77,08% | 1.160 | 90 | 231 | 712 |
   | NPC com os 2 mais fortes | 69,92% | 897 | 482 | 477 | 1.148 |
   | **NPC com o moveset inteiro (hoje)** | **64,52%** | 928 | 417 | 705 | 1.488 |
+
+
+## O MOTOR VIROU GEN 3 DE VERDADE (27/09/2026)
+
+Veio de uma auditoria externa do motor contra a terceira geração, e do pedido que veio com ela:
+*"a gente tem sim que trocar qualquer referência da gen 1 e gen 2 para a gen 3"*. São **quatro
+frentes**, e todas nos DOIS motores.
+
+⚠️ **E A AUDITORIA FOI CONFERIDA, NÃO ACEITADA.** Ela acertou os quatro pares de tipo que nomeou —
+e **não achou dois** que a varredura achou. O método que fez a diferença é o de sempre: **varrer**
+(289 relações e 250 tipagens contra o dado do Showdown) em vez de conferir o que alguém apontou.
+
+### 1. A TABELA DE TIPOS ERA DA GEN 1, com duas linhas de Gen 2 parafusadas
+
+Das **289** relações, quatro divergiam:
+
+| | jogo | Gen 3 | |
+|---|---|---|---|
+| Veneno → Inseto | 2× | **1×** | a Gen 2 tirou |
+| Inseto → Veneno | 2× | **0,5×** | a Gen 2 inverteu |
+| Gelo → Fogo | 1× | **0,5×** | a Gen 2 acrescentou a resistência |
+| **Elétrico → Aço** | 0,5× | **1×** | ⚠️ **não era valor de geração NENHUMA** — o Aço nunca resistiu a Elétrico |
+
+O Fantasma → Psíquico já estava em 2× (o 0× da Gen 1 era o bug famoso dela), e o comentário da
+tabela prometia *"valores da Geração II"* desde que Sombrio e Aço entraram — o que valia pras duas
+linhas novas e não pro resto.
+
+### 2. O SOMBRIO NÃO ERA ESPECIAL — e é o de maior alcance
+
+O `SPECIAL_TYPES` eram **os SETE da Gen 1**. A divisão físico/especial por TIPO da Gen 2/3 tem
+**OITO**: a Gen 2 trouxe Sombrio (especial) e Aço (físico), e só o Aço estava certo, **por
+omissão**. Resíduo de quando Johto chegou.
+
+**Alcance: 54 das 250 espécies (22%)** levam Mordida ou Triturar no moveset padrão — elas são
+aprendidas por meio bestiário. E o projeto separou Sp.Atk/Sp.Def justamente pra não ser Gen 1.
+
+### 3. QUATRO TIPAGENS DIVERGIAM — e duas nenhuma auditoria tinha apontado
+
+| | jogo | Gen 3 | |
+|---|---|---|---|
+| Magnemite / Magneton | Elétrico | **Elétrico/Aço** | eram **GEN 1** (a Gen 2 lhes deu o Aço) |
+| **Psyduck / Golduck** | Água/Psíquico | **Água** | ⚠️ **INVENÇÃO** — eles são Água puro em TODA geração, e o Psíquico não estava registrado em lugar nenhum do projeto |
+
+⚠️ **O Psíquico do Psyduck continua saindo, como SUBTIPO** — a tabela de subtipos já lhe dava
+`["Normal","Psychic"]`. O que ele perde é o **STAB**: de 1,5× pra 0,85×, ou seja **1,76× menos
+dano** no golpe Psíquico.
+
+### 4. O CRÍTICO IGNORA ESTÁGIO, E A PRIORIDADE PASSOU A EXISTIR
+
+- **O crítico da Gen 3 descarta os estágios NEGATIVOS do atributo ofensivo e os POSITIVOS do
+  defensivo** — ele ignora o que atrapalha e mantém o que ajuda. Antes um Ataque em −2 cortava o
+  crítico pela metade, que é o contrário do que o golpe deveria fazer.
+  ⚠️ **E o `isCrit` teve que SUBIR** no `calcDamage`: ele ficava depois do `atkBase`, e a regra
+  muda QUAL atributo entra na conta. **Não há `rng()` entre um ponto e outro**, então a sequência
+  da semente é a mesma — que é a única coisa que não podia mudar ali.
+- **A prioridade não existia**: a ordem do turno era só velocidade, então Ataque Rápido era um
+  golpe de poder 40 e mais nada. São **cinco** golpes de DANO (`PRIORIDADE`); o resto da lista da
+  Gen 3 é status, e status não entra na escolha deste motor.
+  ⚠️ **E ELA SÓ É LIDA DE QUEM CARREGA UM:** saber a prioridade custa um `melhorAtaque` a mais por
+  lado por troca, e **94% das espécies não têm nenhum**. A guarda é o que paga a conta — é a forma
+  das guardas do Remoinho, do gelo e da cura: a pergunta barata vem antes da cara.
+  ⚠️ **E O `rng()` DO DESEMPATE SÓ É LIDO QUANDO AS PRIORIDADES EMPATAM**, o que é a regra da casa
+  (o dado vem depois das guardas).
+
+### O QUE ISSO CUSTOU, MEDIDO
+
+**A impressão do motor MUDA** (`4d7f5a07207a` → `dbc0118b99f9`), que é o que uma mudança de
+mecânica deve fazer. O instrumento foi conferido sensível.
+
+**1x1 PAREADO** (mesmo time, mesma semente, 4.000 batalhas por célula — vale mais que o A/B, que
+não semeia o `Math.random`):
+
+| | antes | agora | |
+|---|---|---|---|
+| **Golduck × Machamp Lv.50** | 83,0% | **3,7%** | ⚠️ **−79,3** — ele perde o STAB do Psíquico, que era a resposta dele contra Lutador |
+| Sneasel × Snorlax Lv.38 | 12,4% | **2,0%** | −10,4 — Atk 95 → SpAtk 35 na Mordida |
+| **Tyrogue × Jolteon Lv.30** | 53,1% | **89,0%** | **+35,9** — a prioridade decide quando a luta é parelha |
+| Magneton × Machamp Lv.36 | 100% | **93,8%** | −6,2 ⚠️ ele ganhou 11 resistências **e virou fraco a Lutador** |
+| Nidoking × Magneton | 100% | 96,0% | −4,0 — o alvo ficou mais duro |
+| Articuno × Arcanine | 6,9% | 3,5% | −3,4 — a Nevasca passou a ser resistida |
+| Jolteon × Skarmory | 99,0% | 100% | +1,0 — o Raio deixou de ser resistido |
+| Gyarados × Machamp, Umbreon × Alakazam | — | — | **não se movem**: o seletor troca de golpe |
+
+⚠️ **E ESSA ÚLTIMA LINHA É O ACHADO QUE MAIS SURPREENDE: o `melhorAtaque` ABSORVE boa parte da
+mudança de tabela.** Ele escolhe o tipo que rende mais, então quando Inseto → Veneno cai de 2× pra
+0,5× o Scyther simplesmente ataca de Voador — medido, **Scyther × Muk não se move um décimo**. O
+que muda de verdade é onde **não há alternativa** (o Golduck) ou onde o ATRIBUTO troca (o Sombrio).
+
+**A PRIORIDADE, por frequência** (20.000 trocas entre os 15 portadores): ela difere entre os dois
+lados em **13,7%** das trocas e **INVERTE a ordem da velocidade em 8,6%** — **0,59% das trocas do
+jogo inteiro**. Pequeno, e não é código morto.
+
+### ⚠️ E NA JORNADA ISSO CUSTA −3,91 PONTOS, 4,1σ — NÃO É RUÍDO
+
+8 blocos de 800 jornadas de cada lado (**6.400 de cada**), o MESMO bot contra duas cópias
+congeladas, desvio tirado de ENTRE os blocos:
+
+| | conclusão | |
+|---|---|---|
+| **antes** (a tabela Gen 1) | **55,06%** | desvio entre blocos 2,22 |
+| **depois** (Gen 3 inteira) | **51,16%** | desvio entre blocos 1,55 |
+| | **−3,91 ponto, 4,1σ** | ⚠️ **0 de 8 blocos** pro lado novo |
+
+**É a segunda maior mexida de dificuldade do projeto**, atrás só do +2 níveis nos líderes (−11,42).
+E a direção faz sentido: **o jogador perdeu mais que os NPCs**, porque quase tudo que mudou tirou
+opção de quem ATACA — o Sombrio enfraquecendo em 54 espécies, o Gelo sendo resistido pelo Fogo, e
+o Golduck perdendo a resposta dele contra Lutador.
+
+**E DÁ PRA ATRIBUIR**, com um terceiro braço (Gen 3 inteira MENOS a troca do Psyduck):
+
+| | conclusão | contra o "antes" |
+|---|---|---|
+| Gen 3 inteira | 51,16% | **−3,91, 4,1σ** |
+| Gen 3 **sem** a troca do Psyduck | 52,66% | −2,41, 2,6σ |
+| | | **→ o Psyduck sozinho: −1,50, 2,0σ** |
+
+⚠️ **O Psyduck é 38% do custo, e ele mora em 4 das 32 rotas** (Rotas 24/25 no trecho 2 e Seafoam
+no trecho 7, nas duas regiões). **Se um dia incomodar, ele é a alavanca isolada** — devolver o
+Psíquico a ele custa 1,5 ponto de dificuldade e é a única das cinco frentes que não tem respaldo
+em geração nenhuma (ela era invenção do projeto, não herança).
+
+⚠️ **E OS 2,6σ DO BRAÇO DO MEIO estão exatamente no limiar que este projeto já viu sair por
+acaso** (o A/B dos terrenos de ginásio, 25/09). O que sustenta o número cheio é o **4,1σ com 0 de
+8 blocos** e o fato de ele CONCORDAR com as medições pareadas 1x1 — quando o A/B contradiz a conta
+direta é que ele precisa de um segundo.
+
+### ⚠️ E DUAS TRAVAS CAÍRAM SEM DEFEITO NENHUM
+
+As duas mediam a **circunstância**, e a mudança de dano re-sorteou a amostra: elas caíram em casos
+que nunca tinham visto. **Conferido: a cópia congelada passa 3 de 3 e as duas falham 3 de 3** — ou
+seja amostra nova, não intermitência.
+
+1. **A tolerância do "número que a fórmula não produz" ignorava a ESCALA GEN 1.** O dano é
+   calculado em números pequenos e só depois projetado na barra: um golpe que aparece como 25 vale
+   **~8** lá dentro, e um `round` sobre 8 é ±6%. **São DOIS arredondamentos** (um na escala Gen 1,
+   outro ao projetar), e a trava não contava nenhum — o piso dela era 1,25 e o máximo produzível
+   num golpe de 8 é **1,33**. O caso: Chansey × Phanpy, Bomba-Ovo de 25 e 32.
+   ⚠️ **E contar só o primeiro deixou a conta 0,6% curta** (Sneasel × Slowbro, 43 e 54): os dois
+   fatores são lidos do CÓDIGO, não ajustados até passar. **Conferido que ela ainda morde:**
+   alargando a variação de dano pra 0,50–1,00 ela acusa com **17 falhas**.
+2. **O `confuso` também prova que a troca passou** — a QUARTA vez que aquela trava mede a
+   circunstância em vez da regra. Quem dormiu o alvo ficou confuso e se acertou, então ninguém
+   bateu no adormecido e não saiu `dormindo` nenhum. A regra é *"ele não acorda antes da vez
+   dele"*, e uma troca em que o atacante se acertou continua sendo uma troca.
+
+### O QUE FICOU DE FORA, E É DECISÃO
+
+A auditoria apontou mais cinco coisas, e as cinco são **adaptação deliberada deste jogo**, com
+medição registrada: o **golpe teimoso** (139 confrontos impossíveis → 0), as **proteções contra
+nocaute**, os buffs de **shiny 1,20 / terreno 1,15 / especialidade 1,05**, o **redutor de subtipo
+0,85** e a **chuva**. Nenhuma foi tocada.
+
+⚠️ **E o PP é INAPLICÁVEL, não "não implementado":** um confronto tem **1,96 troca de mediana** —
+os 5 PP do Dynamic Punch nunca acabariam.
+
+**A PRECISÃO ficou em aberto, e a régua está aqui:** o campo já existe na base (`precisao`), 27%
+do moveset padrão tem menos de 100 e a média do que o motor escolhe é **95,9%** — ou seja ele
+entrega hoje ~4,1% de dano a mais que a Gen 3. ⚠️ **O argumento a favor não é fidelidade, é
+desenho:** o `ataquesPadrao` ordena por PODER, então ele prefere sistematicamente o impreciso
+(Hydro Pump 120/80 sempre ganha do Surf 95/100). **O argumento contra é o que este projeto já
+viveu:** perder um confronto pra um dado invisível é a reclamação que forçou a mudança do sono —
+se ela entrar, o erro **tem que aparecer na tela**.
+
+`tools/test-terrenos.js` tranca as 289 relações e as 250 tipagens contra uma referência **Gen 3
+independente** (tirada do Showdown e escrita no teste), e `tools/test-especiais.js` tranca o
+Sombrio, o crítico e a prioridade. **13 de 13 defeitos religados acusam.**
+

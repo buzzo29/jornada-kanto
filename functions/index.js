@@ -62,8 +62,8 @@ const SPECIES = {
   arbok:{dex:24, name:'Arbok', types:['Poison'], hp:60, attack:85, defense:69, speed:80},
   diglett:{dex:50, name:'Diglett', types:['Ground'], hp:10, attack:55, defense:25, speed:95},
   dugtrio:{dex:51, name:'Dugtrio', types:['Ground'], hp:35, attack:80, defense:50, speed:120},
-  magnemite:{dex:81, name:'Magnemite', types:['Electric'], hp:25, attack:35, defense:70, speed:45},
-  magneton:{dex:82, name:'Magneton', types:['Electric'], hp:50, attack:60, defense:95, speed:70},
+  magnemite:{dex:81, name:'Magnemite', types:['Electric','Steel'], hp:25, attack:35, defense:70, speed:45},
+  magneton:{dex:82, name:'Magneton', types:['Electric','Steel'], hp:50, attack:60, defense:95, speed:70},
   drowzee:{dex:96, name:'Drowzee', types:['Psychic'], hp:60, attack:48, defense:45, speed:42},
   hypno:{dex:97, name:'Hypno', types:['Psychic'], hp:85, attack:73, defense:70, speed:67},
   nidoranf:{dex:29, name:'Nidoran (F)', types:['Poison'], hp:55, attack:47, defense:52, speed:41},
@@ -93,8 +93,8 @@ const SPECIES = {
   // Água/Psíquico pra bater com o pokemon-ginasio.html. ATENÇÃO: no jogo original Psyduck e Golduck
   // são Água PURO -- o tipo Psíquico aqui é uma divergência antiga do cliente. Alinhado ao cliente
   // porque é o que os jogadores conhecem; se um dia for corrigido, tem que ser nos DOIS arquivos
-  psyduck:{dex:54, name:'Psyduck', types:['Water','Psychic'], hp:50, attack:52, defense:48, speed:55},
-  golduck:{dex:55, name:'Golduck', types:['Water','Psychic'], hp:80, attack:82, defense:78, speed:85},
+  psyduck:{dex:54, name:'Psyduck', types:['Water'], hp:50, attack:52, defense:48, speed:55},
+  golduck:{dex:55, name:'Golduck', types:['Water'], hp:80, attack:82, defense:78, speed:85},
   krabby:{dex:98, name:'Krabby', types:['Water'], hp:30, attack:105, defense:90, speed:50},
   kingler:{dex:99, name:'Kingler', types:['Water'], hp:55, attack:130, defense:115, speed:75},
   horsea:{dex:116, name:'Horsea', types:['Water'], hp:30, attack:40, defense:70, speed:60},
@@ -272,24 +272,35 @@ const SPECIES = {
 };
 
 const TYPE_CHART = {
-  // as 5 imunidades totais do Gen 1 (Normal/Lutador vs Fantasma, Fantasma vs Normal, Terra vs Voador,
-  // Elétrico vs Terra) valem 0 de novo, como na Gen 1 de verdade. Elas valeram 0.25 por um tempo,
-  // pra nada ser 100% imune -- ver a nota de imunidade no CLAUDE.md pro que essa volta custa.
+  // as 5 imunidades totais (Normal/Lutador vs Fantasma, Fantasma vs Normal, Terra vs Voador,
+  // Elétrico vs Terra) valem 0. Elas valeram 0.25 por um tempo, pra nada ser 100% imune -- ver a
+  // nota de imunidade no CLAUDE.md pro que essa volta custa.
+  /* ⚠️ A TABELA É DA GEN 3 DESDE 27/09/2026, e ela era uma de GEN 1 com duas linhas de Gen 2
+     parafusadas (o Sombrio e o Aço, que a Gen 2 trouxe). VARRIDAS as 289 relações contra o dado do
+     Showdown, QUATRO divergiam -- e as quatro estão corrigidas aqui:
+       Veneno -> Inseto  2x -> 1x     (a Gen 2 tirou)
+       Inseto -> Veneno  2x -> 0.5x   (a Gen 2 inverteu)
+       Gelo   -> Fogo    1x -> 0.5x   (a Gen 2 acrescentou a resistência)
+       Elétrico -> Aço  0.5x -> 1x    ⚠️ esta não era valor de geração NENHUMA: o Aço nunca
+                                         resistiu a Elétrico, em lugar nenhum.
+     O Fantasma -> Psíquico já estava em 2x (o 0x da Gen 1 era o bug famoso dela).
+     ⚠️ E A VARREDURA É O QUE VALE: conferir "as quatro que alguém apontou" não prova que são
+     quatro. A das 289 está em tools/test-terrenos.js e ela é o que impede a próxima voltar. */
   Normal:{Rock:0.5, Ghost:0, Steel:0.5},
   Fire:{Grass:2,Bug:2,Rock:0.5,Water:0.5,Fire:0.5,Ice:2,Dragon:0.5,Steel:2},
   Water:{Fire:2,Rock:2,Ground:2,Water:0.5,Grass:0.5,Dragon:0.5},
   Grass:{Water:2,Rock:2,Ground:2,Fire:0.5,Grass:0.5,Poison:0.5,Flying:0.5,Bug:0.5,Dragon:0.5,Steel:0.5},
-  Poison:{Grass:2,Bug:2,Rock:0.5,Ground:0.5,Poison:0.5,Ghost:0.5,Steel:0},
+  Poison:{Grass:2,Rock:0.5,Ground:0.5,Poison:0.5,Ghost:0.5,Steel:0},
   Flying:{Grass:2,Fighting:2,Bug:2,Rock:0.5,Electric:0.5,Steel:0.5},
-  Bug:{Grass:2,Poison:2,Fighting:0.5,Flying:0.5,Fire:0.5,Psychic:2,Ghost:0.5,Dark:2,Steel:0.5},
+  Bug:{Grass:2,Poison:0.5,Fighting:0.5,Flying:0.5,Fire:0.5,Psychic:2,Ghost:0.5,Dark:2,Steel:0.5},
   Fighting:{Normal:2,Rock:2,Poison:0.5,Flying:0.5,Bug:0.5,Psychic:0.5,Ghost:0,Ice:2,Dark:2,Steel:2},
   Rock:{Fire:2,Flying:2,Bug:2,Fighting:0.5,Ground:0.5,Ice:2,Steel:0.5},
   Ground:{Fire:2,Rock:2,Poison:2,Grass:0.5,Bug:0.5,Electric:2,Flying:0,Steel:2},
   Psychic:{Fighting:2,Poison:2,Psychic:0.5,Dark:0,Steel:0.5},
-  Electric:{Water:2,Flying:2,Grass:0.5,Electric:0.5,Ground:0,Dragon:0.5,Steel:0.5},
+  Electric:{Water:2,Flying:2,Grass:0.5,Electric:0.5,Ground:0,Dragon:0.5},
   Ghost:{Ghost:2,Psychic:2,Normal:0,Dark:0.5,Steel:0.5},
   Dragon:{Dragon:2,Steel:0.5},
-  Ice:{Grass:2,Ground:2,Flying:2,Dragon:2,Water:0.5,Ice:0.5,Steel:0.5},
+  Ice:{Grass:2,Ground:2,Flying:2,Dragon:2,Water:0.5,Ice:0.5,Fire:0.5,Steel:0.5},
   /* SOMBRIO e AÇO -- os dois tipos que a Gen 2 trouxe, e sem eles metade de Johto não funciona
      (Umbreon, Houndoom, Tyranitar, Scizor, Steelix, Skarmory, o ginásio da Jasmine...).
      Valores da Geração II, que diferem dos modernos em dois pontos: o Aço ainda resiste a
@@ -411,7 +422,15 @@ function typeVsType(atk, def){
   const val = chart[def];
   return (val === undefined) ? 1 : val;
 }
-const SPECIAL_TYPES = new Set(['Fire','Water','Grass','Electric','Psychic','Ice','Dragon']);
+/* ⚠️ O SOMBRIO ENTROU EM 27/09/2026, e a falta dele era resíduo de quando Johto chegou: este
+   conjunto são os SETE da Gen 1, e a divisão físico/especial por TIPO da Gen 2/3 tem OITO -- a Gen
+   2 trouxe Sombrio (especial) e Aço (físico), e só o Aço estava certo, por omissão.
+   Sem ele, Mordida e Triturar saíam de Ataque/Defesa -- e isso alcança 54 das 250 espécies (22%),
+   porque Mordida é aprendida por meio bestiário. O projeto separou Sp.Atk/Sp.Def justamente pra
+   não ser Gen 1; esta linha tinha ficado pra trás.
+   ⚠️ E NÃO É SÓ DANO: o melhorAtaque compara com o mesmo atributo, então a ESCOLHA do golpe
+   muda junto -- que é o que impede o motor de escolher por uma regra e aplicar outra. */
+const SPECIAL_TYPES = new Set(['Fire','Water','Grass','Electric','Psychic','Ice','Dragon','Dark']);
 function isSpecialType(type){ return SPECIAL_TYPES.has(type); }
 /* ============================================================================
    SUBTIPOS DE ATAQUE  (espelho do pokemon-ginasio.html)
@@ -849,30 +868,30 @@ function effectiveBaseHp(p){
   const v = (typeof p.baseHp==='number') ? p.baseHp : ((SPECIES[p.speciesId]&&SPECIES[p.speciesId].hp)||50);
   return withFuria(withItemStat(withSpecialty(withBuffs(v, p), p), p, 'baseHp'), p);
 }
-function effectiveAttack(p){
+function effectiveAttack(p, crit){
   const v = (typeof p.attack==='number') ? p.attack : ((SPECIES[p.speciesId]&&SPECIES[p.speciesId].attack)||50);
-  return withEstagio(withQueimadura(withDanca(withFuria(withItemStat(withSpecialty(withBuffs(v, p), p), p, 'attack'), p), p), p), p, 'atk');
+  return withEstagio(withQueimadura(withDanca(withFuria(withItemStat(withSpecialty(withBuffs(v, p), p), p, 'attack'), p), p), p), p, 'atk', crit);
 }
-function effectiveDefense(p){
+function effectiveDefense(p, crit){
   const v = (typeof p.defense==='number') ? p.defense : ((SPECIES[p.speciesId]&&SPECIES[p.speciesId].defense)||50);
-  return withEstagio(withFuria(withItemStat(withSpecialty(withBuffs(v, p), p), p, 'defense'), p), p, 'def');
+  return withEstagio(withFuria(withItemStat(withSpecialty(withBuffs(v, p), p), p, 'defense'), p), p, 'def', crit);
 }
 /* Sp.Atk e Sp.Def, oficiais da Gen 2. Instancia gravada ANTES do split nao tem os campos -- cai no
    valor da especie, mesma migracao ja usada pela velocidade. O 50 no fim so pega instancia de
    especie desconhecida; nenhuma das especies da tabela chega la.
    Existiu aqui um terceiro degrau, o campo `special` da Gen 1 (um numero so pra ataque E defesa
    especial). Saiu junto com o campo: o jogo nao usa mais nada da Gen 1 em atributo. */
-function effectiveSpAtk(p){
+function effectiveSpAtk(p, crit){
   const sp = SPECIES[p.speciesId];
   const v = (typeof p.spAtk === 'number') ? p.spAtk
           : (sp && typeof sp.spAtk === 'number') ? sp.spAtk : 50;
-  return withEstagio(withFuria(withItemStat(withSpecialty(withBuffs(v, p), p), p, 'spAtk'), p), p, 'spAtk');
+  return withEstagio(withFuria(withItemStat(withSpecialty(withBuffs(v, p), p), p, 'spAtk'), p), p, 'spAtk', crit);
 }
-function effectiveSpDef(p){
+function effectiveSpDef(p, crit){
   const sp = SPECIES[p.speciesId];
   const v = (typeof p.spDef === 'number') ? p.spDef
           : (sp && typeof sp.spDef === 'number') ? sp.spDef : 50;
-  return withEstagio(withFuria(withItemStat(withSpecialty(withBuffs(v, p), p), p, 'spDef'), p), p, 'spDef');
+  return withEstagio(withFuria(withItemStat(withSpecialty(withBuffs(v, p), p), p, 'spDef'), p), p, 'spDef', crit);
 }
 /* A FÓRMULA DA GEN 3 -- a cópia do cliente tem a nota inteira; as duas TÊM que ser idênticas. */
 function effectiveSpeed(p){
@@ -1453,14 +1472,18 @@ function calcDamage(attacker, defender, rng, op){
   // STAB só pro tipo próprio; subtipo perde o bônus e ainda leva o redutor
   const STAB = op.semTipo ? 1 : (best.stab ? 1.5 : SUBTYPE_PENALTY);
   // ---- fórmula oficial da Gen 1, idêntica ao calcDamageNew do cliente ----
-  const atkBase = special ? effectiveSpAtk(attacker) : effectiveAttack(attacker);   // COM buffs (ofensivo)
-  const defBase = special ? effectiveSpDef(defender) : effectiveDefense(defender);  // Gen 2: defesa especial propria
-  const A = statAtLevel(atkBase, attacker.level);
-  const D = statAtLevel(defBase, defender.level);
   /* `op.semCritico` -- o golpe nao pode ser critico. Existe pra a CONFUSAO, que no jogo oficial
      tambem nao critica. O rng E CONSUMIDO do mesmo jeito: os dois motores tem que ler a mesma
      quantidade de numeros da mesma semente, senao a batalha diverge do 2o golpe em diante. */
+  /* ⚠️ ELE SUBIU EM 27/09/2026 -- ele ficava DEPOIS do atkBase/defBase, e precisa vir antes porque
+     o critico da Gen 3 muda QUAL atributo entra na conta (ele ignora estagio que atrapalha). Nao
+     ha `rng()` nenhum entre o lugar antigo e este, entao a SEQUENCIA da semente e a mesma -- que e
+     a unica coisa que nao podia mudar aqui (os dois motores leem a mesma semente na mesma ordem). */
   const isCrit = (rng() < chanceDeCritico(best.golpe)) && !op.semCritico;   // Gen 3: chance fixa, +1 estágio nos golpes de crítico alto
+  const atkBase = special ? effectiveSpAtk(attacker, isCrit && 'atacante') : effectiveAttack(attacker, isCrit && 'atacante');   // COM buffs (ofensivo)
+  const defBase = special ? effectiveSpDef(defender, isCrit && 'defensor') : effectiveDefense(defender, isCrit && 'defensor');  // Gen 2: defesa especial propria
+  const A = statAtLevel(atkBase, attacker.level);
+  const D = statAtLevel(defBase, defender.level);
   attacker.lastCrit = isCrit;   // registro pro log, como o lastMoveType acima
   /* Imunidade: o multiplicador é 0, mas o dano tem piso de 1 -- dano 0 dos dois lados travaria
      o laço da luta pra sempre. O log precisa saber a diferença entre "tirou 1" e "não teve
@@ -1672,6 +1695,32 @@ const TAPAS_2A5 = [[2,3],[3,3],[4,1],[5,1]];
    própria, ele ganha o array dele aqui e mais nada muda") -- o motor, o log, a animação e o selo
    `2x` saem de graça, e o `poderEfetivo` já faz a média ponderada de qualquer tabela. */
 const TAPAS_SEMPRE_2 = [[2,1]];
+/* ============================================================================
+   A PRIORIDADE DOS GOLPES (27/09/2026). Ate aqui a ordem do turno era so VELOCIDADE, entao
+   Ataque Rapido era um golpe de poder 40 e mais nada -- o que ele TEM no original (bater antes,
+   independente de velocidade) nao existia.
+
+   ⚠️ SO OS DE DANO ENTRAM. A lista da Gen 3 e bem maior, mas o resto dela e golpe de STATUS
+   (Protect, Detect, Endure, Helping Hand...) e status nao entra na escolha deste motor -- seria
+   linha que nunca roda, do tipo que fica anos no arquivo sem ninguem saber que esta morta.
+
+   ⚠️ E MEDIDO ANTES DE ESCREVER: 15 das 250 especies levam um destes no moveset padrao, e entre
+   ELAS o golpe de prioridade e o ESCOLHIDO em 11,8% das vezes -- 0,71% das escolhas do jogo
+   inteiro. Pequeno, mas nao e codigo morto: o Tyrogue escolhe Ataque Rapido em 267 de 4.000
+   (o arsenal dele e fraco, entao o de poder 40 ganha).
+   ============================================================================ */
+const PRIORIDADE = { quickattack: 1, extremespeed: 1, machpunch: 1, fakeout: 1, vitalthrow: -1 };
+function prioridadeDoGolpe(id){ return PRIORIDADE[id] || 0; }
+/* ⚠️ ELA SO E LIDA DE QUEM CARREGA UM, e essa guarda e o que paga a conta: saber a prioridade
+   custa um `melhorAtaque` a mais por lado por troca, e 94% das especies nao tem nenhum golpe de
+   prioridade -- pra elas o custo vira uma varredura de 2 itens. E a mesma forma das guardas do
+   Remoinho, do gelo e da cura: a pergunta barata vem antes da cara. */
+function prioridadeNaTroca(atacante, alvo){
+  const meus = atacante && atacante.ataques;
+  if(!Array.isArray(meus) || !meus.some(a => PRIORIDADE[a])) return 0;
+  const m = melhorAtaque(atacante, alvo);
+  return m ? prioridadeDoGolpe(m.golpe) : 0;
+}
 const MULTI_GOLPE = {
   doubleslap:  TAPAS_2A5,   // Tapa Duplo          poder 15  -- 13 espécies
   furyswipes:  TAPAS_2A5,   // Arranhões Furiosos  poder 18  -- 20
@@ -2707,8 +2756,17 @@ function estagioDe(p, qual){ return (p && p._estagios && p._estagios[qual]) || 0
    fúria: "metade da Defesa" é metade do que o pokémon TEM na hora do golpe. É a MESMA regra do
    corte da queimadura e das duas Danças, e o motivo é o mesmo -- entrando antes, ele multiplicaria
    só a parte base e o +15 do item ficaria de fora da conta. */
-function withEstagio(v, p, qual){
-  const e = estagioDe(p, qual);
+/* ⚠️ O `crit` E A REGRA DA GEN 3 (27/09/2026): o critico IGNORA o que atrapalha o atacante e
+   MANTEM o que o ajuda -- ele descarta os estagios NEGATIVOS do atributo ofensivo e os POSITIVOS
+   do defensivo do alvo. Sem isso um Ataque em -2 cortava o critico pela metade, que e o contrario
+   do que o golpe deveria fazer.
+   ⚠️ E ELE E OPCIONAL de proposito: as quatro `effective*` sao lidas por meia duzia de telas (a
+   ficha, o log, o montador) e por todo o resto do motor. Sem argumento, nada muda -- que e o que
+   mantem os outros 40 chamadores identicos. */
+function withEstagio(v, p, qual, crit){
+  let e = estagioDe(p, qual);
+  if(crit === 'atacante') e = Math.max(0, e);
+  else if(crit === 'defensor') e = Math.min(0, e);
   return e ? Math.round(v * multDoEstagio(e)) : v;
 }
 /* Move o estágio e devolve se ele REALMENTE mudou. No teto, nada muda -- e aí não sai linha: um
@@ -3084,8 +3142,20 @@ function doExchange(active, enemy, rng, diario){
   const activeConfuso = activeConf === "acerta", enemyConfuso = enemyConf === "acerta";
   const spdActive = effectiveSpeed(active);
   const spdEnemy = effectiveSpeed(enemy);
+  /* ⚠️ A PRIORIDADE VEM ANTES DA VELOCIDADE (27/09/2026), que é a ordem da Gen 3: Ataque Rápido
+     bate primeiro mesmo contra quem é mais rápido. Ela é lida do golpe que o `melhorAtaque`
+     escolheria AGORA -- e ler o estado de ANTES das ações é o certo, porque no original a ordem
+     do turno é decidida no começo dele, com o golpe que cada lado selecionou.
+     ⚠️ E O `rng()` DO DESEMPATE SÓ É LIDO QUANDO AS PRIORIDADES EMPATAM: quando elas diferem a
+     velocidade nem é consultada, então o dado não é gasto. É a regra da casa (o dado vem depois
+     das guardas, como no Remoinho e no gelo) -- e ela muda a sequência da semente, que é o que
+     uma mudança de mecânica deve fazer. */
+  const prioActive = prioridadeNaTroca(active, enemy);
+  const prioEnemy  = prioridadeNaTroca(enemy, active);
   // empate de velocidade: sorteio -- usa o mesmo rng da batalha, então nas Ligas (seed fixa) é determinístico
-  const activeFirst = spdActive > spdEnemy || (spdActive === spdEnemy && rng() < 0.5);
+  const activeFirst = prioActive !== prioEnemy
+    ? prioActive > prioEnemy
+    : (spdActive > spdEnemy || (spdActive === spdEnemy && rng() < 0.5));
   const first  = activeFirst ? active : enemy;
   const second = activeFirst ? enemy : active;
   /* ⚠️ O acaoDaTroca DECIDE e devolve o efeito num aplica() -- ele nao mexe em nada sozinho. Isso
