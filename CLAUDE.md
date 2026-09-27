@@ -104,6 +104,24 @@ subseção e a conta continua fechando.
   intervalo devolve o comportamento velho -- foi exatamente o que aconteceu no print da Faixa.
   Conferir com o `Deploy complete!` e, na dúvida, comparar o arquivo no ar com o local
   (`curl -s https://jornadakanto.com/index.html | cmp - index.html`).
+- **⚠️ E O `Deploy complete!` NÃO SIGNIFICA QUE TUDO SUBIU — descoberto em 27/09/2026.** Um deploy
+  saiu com **21 functions falhando por quota** (`HTTP Error: 429, Quota exceeded for ... Per
+  project mutation requests per minute per region`) **e mesmo assim imprimiu `Deploy complete!`
+  no fim**, junto com o `release complete` do hosting. O item acima mandava conferir exatamente
+  essa linha — e ela passou com um terço das functions na versão velha.
+  **⚠️ E ISSO É GRAVE JUSTAMENTE QUANDO O MOTOR MUDA:** entre as 21 estavam `acceptOnlineMatch`,
+  `getOnlineBattle` e `pickOnlineBattleTeam` — a batalha ONLINE, que roda o `simulateGymBattle` no
+  servidor. Com o cliente na tabela nova e elas na velha, **a mesma partida termina diferente nos
+  dois lados**, que é a divergência que este arquivo registra como o pior defeito possível das
+  ligas. E nada quebra: ela só decide errado.
+  **O QUE CONFERIR, então:** `grep -c "HTTP Error: 429" no log` e `grep -c "Successful"`. Falhando,
+  o conserto é redeployar **só as que falharam**, por nome — a quota é por MINUTO, então esperar
+  ~1 minuto e mandar a lista resolve:
+  ```
+  grep -oE "functions/[a-zA-Z]+\?updateMask" log | sed 's#functions/##;s#?updateMask##' | sort -u
+  firebase deploy --only functions:nome1,functions:nome2,...
+  ```
+  Medido: as 21 subiram de uma vez na segunda tentativa, com 0 erros.
 - **⚠️ NENHUMA ARTE GRANDE DENTRO DO `index.html` (27/09/2026).** Ele vai com `no-cache` e o
   Hosting **nunca devolve 304** pra ele, então tudo que está dentro é baixado em TODA abertura —
   e base64 ainda infla **33%**. A arte dos efeitos de golpe (`BATTLE_ATTACK_ART`) nasceu embutida
