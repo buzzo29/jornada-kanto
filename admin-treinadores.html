@@ -373,6 +373,7 @@ function treinadorHtml(t){
     ${aberto ? `<div class="tre-corpo">
       <p class="tre-meta">uid ${esc(t.uid)}${t.cidade ? ' · ' + esc(t.cidade) : ''}${t.admin ? ' · ADMIN' : ''}</p>
       <div class="fichas">${contaHtml(t)}</div>
+      ${botaoDaTrainersHtml(t)}
       ${t.saves.length ? `<div class="secao">${t.saves.length} save${t.saves.length === 1 ? '' : 's'}</div>` : ''}
       ${t.saves.length ? t.saves.map(sv => saveHtml(sv, t.uid)).join('') : '<p class="vazio">nenhum save nesta conta.</p>'}
     </div>` : ''}
@@ -434,6 +435,44 @@ function render(){
    MESMAS exigências que o servidor faz. Oferecer a ação num save que a callable vai recusar é
    pior que não oferecer: o admin clica e leva um erro que a tela já sabia.
    ⚠️ E QUEM JÁ ESTÁ NA FILA vê o estado, não o botão -- a inscrição é UMA por conta por ciclo. */
+/* ⚠️ O BOTÃO DA TRAINERS LEAGUE É DA CONTA, e não do save -- e é por isso que ele mora aqui e não
+   no `botaoDaLigaHtml`. As duas ligas inscrevem coisas diferentes:
+     - a Clássica entra com UM save escolhido (o botão nasce dentro do card de cada save);
+     - a Trainers League entra com TODOS os times aptos da conta de uma vez.
+   Repetir o botão em cada save daria N botões que fazem exatamente a mesma coisa.
+   ⚠️ E ELE SÓ APARECE QUANDO HÁ TIME APTO, pela mesma regra do outro: oferecer uma ação que a
+   callable vai recusar é pior que não oferecer -- o admin clica e leva um erro que a tela já sabia.
+   A conta da tela é a MESMA do servidor (8 insígnias, time montado, não aposentado), e quando elas
+   discordarem quem manda é o servidor: ele recusa e a mensagem aparece. */
+function timesAptosDaConta(t){
+  return (t.saves || []).filter(s => !s.aposentado && (s.insignias || 0) >= 8 && (s.time || []).length).length;
+}
+function botaoDaTrainersHtml(t){
+  const aptos = timesAptosDaConta(t);
+  if(!aptos) return '';
+  const inscrito = estado.trainersInscritos && estado.trainersInscritos[t.uid];
+  if(inscrito) return '<p class="onde ok">✅ inscrito na Trainers League de hoje (' + inscrito + ' time' + (inscrito === 1 ? '' : 's') + ')</p>';
+  return `<button class="btn secondary" onclick="inscreverNaTrainers('${esc(t.uid)}')"`
+    + ` ${estado.trainersCarregando ? 'disabled' : ''}>🥊 Inscrever na Trainers League`
+    + ` <small>(${aptos} time${aptos === 1 ? '' : 's'})</small></button>`;
+}
+/* ⚠️ ELA NÃO RECARREGA A FILA DA CLÁSSICA -- são ligas diferentes, e o `carregarFila` leria um
+   ciclo que esta ação não tocou. O que a tela precisa saber é que ESTE treinador entrou, e isso o
+   próprio retorno da callable diz (`times`). */
+async function inscreverNaTrainers(uid){
+  estado.trainersCarregando = true; estado.filaErro = null; estado.filaAcao = null; render();
+  try{
+    const r = await fns.httpsCallable('adminAddTrainersLeagueRegistration')({ uid });
+    const d = (r && r.data) || {};
+    estado.trainersInscritos = estado.trainersInscritos || {};
+    estado.trainersInscritos[uid] = d.times || 1;
+    estado.filaAcao = '✅ ' + (d.nome || uid) + ' inscrito na Trainers League de ' + (d.dateId || 'hoje')
+      + ' com ' + (d.times || '?') + ' time(s).'
+      + (d.contador != null ? ' Agora são ' + d.contador + ' inscritos.' : '');
+  }catch(e){ estado.filaErro = 'Não deu pra inscrever na Trainers League: ' + (e && e.message ? e.message : e); }
+  estado.trainersCarregando = false;
+  render();
+}
 function botaoDaLigaHtml(s, uidDono){
   if(!uidDono) return '';
   if(!estado.fila || !estado.fila.ciclo) return '';

@@ -106,7 +106,8 @@ const PROTEGIDAS = ['acceptOnlineMatch','challengeFriend','challengeLobbyPlayer'
      agendado pro convidado e o cancel e limpeza -- bloquea-los so daria erro em console.
    - BOSS: nao esta nos cinco, e o evento esta desligado (`BOSS_ATIVO`). */
 const LIVRES = ['activateBoughtShinyBonus','activateEliteShinyBonus','activateMewtwoLoan','activateShinyBonus',
-'adminAddLeagueRegistration','adminLeagueQueue','adminListTrainers','adminRemoveLeagueRegistration','buyItem',
+'adminAddLeagueRegistration','adminAddTrainersLeagueRegistration','adminLeagueQueue','adminListTrainers',
+'adminRemoveLeagueRegistration','buyItem',
 'cancelFriendChallenge','checkMewtwoLoanUnlock','checkNeighborhoodGymDefenseForSlot','claimAchievementCoins',
 'claimEliteShinyBonus','claimJourneyCoins','consumeEquipped','deleteNotification','deleteNotifications',
 'equipItem','fightSundayBoss','getMyActiveGymDefenses','getMyNotifications','getSundayBoss',

@@ -257,6 +257,60 @@ const cenasPesadas = G.map(t => ({ id:t.id, arq: path.join(RAIZ,'assets','batalh
   .filter(x => x.kb > 600);
 ok('  e nenhuma passa de 600 KB', cenasPesadas.length === 0,
    cenasPesadas.map(x => x.id + ' ' + x.kb + 'KB').join(', '));
+/* ⚠️ NENHUMA ARTE GRANDE PODE VOLTAR PRA DENTRO DO `index.html` (27/09/2026). Ele vai com
+   `no-cache` e o Hosting **nunca devolve 304** pra ele (medido em 19/09), entao tudo que esta
+   dentro e baixado em TODA abertura, por todo jogador. E base64 ainda infla 33%.
+   A arte dos golpes (`BATTLE_ATTACK_ART`) nasceu embutida e pesava **1.480 KB** -- 1.973 KB em
+   base64, 42% do arquivo. Extraida pra `assets/batalha/fx-ataques.webp` ela baixa UMA vez
+   (`max-age=3600` + ETag) e o index caiu de 4,61 pra 2,69 MB: num 4G ruim, de 12,1s pra 7,0s por
+   abertura.
+   ⚠️ O TETO E DE 64 KB POR IMAGEM, e ele deixa passar o que faz sentido embutido: os 16 sprites
+   de lider tem ~1 KB cada (a requisicao extra custaria mais que o byte economizado). O que ele
+   pega e a proxima arte de megabyte -- e ela entra em silencio, porque nada quebra: o jogo so
+   fica mais lento pra todo mundo. */
+{
+  const _fsI = require('fs');
+  const _idx = _fsI.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const embutidas = [..._idx.matchAll(/data:image\/[a-z]+;base64,([A-Za-z0-9+\/=]+)/g)]
+    .map(m => Math.round(m[1].length * 0.75 / 1024));
+  const grandes = embutidas.filter(kb => kb > 64);
+  ok('nenhuma imagem embutida passa de 64 KB', grandes.length === 0,
+     grandes.length ? grandes.join(' KB, ') + ' KB -- extraia pra assets/ e referencie por caminho'
+                    : embutidas.length + ' imagens, a maior com ' + Math.max(0, ...embutidas) + ' KB');
+  /* ⚠️ E O ARQUIVO INTEIRO TEM TETO, porque muita imagem pequena soma igual. 3 MB e folgado pro
+     tamanho de hoje (2,7 MB) e aperta antes de o download voltar a doer. */
+  const mb = _fsI.statSync(path.join(__dirname, '..', 'index.html')).size / 1048576;
+  ok('  e o index.html continua abaixo de 3 MB', mb < 3, mb.toFixed(2) + ' MB');
+  /* ⚠️ E A ARTE DOS GOLPES TEM QUE ESTAR NO DISCO: a regra acima sozinha passaria com a constante
+     apontando pra um arquivo que nao existe -- e o sintoma disso e MUDO (o desenho cai no basico
+     e o jogo continua funcionando, so sem efeito nenhum). */
+  const mArte = _idx.match(/const BATTLE_ATTACK_ART = "([^"]+)"/);
+  ok('  e a arte dos golpes aponta pra um arquivo', !!mArte && mArte[1].indexOf('data:') < 0,
+     mArte ? mArte[1].slice(0, 48) : '(nao achei a constante)');
+  ok('    e ele existe no disco',
+     !!mArte && _fsI.existsSync(path.join(__dirname, '..', mArte[1])),
+     mArte ? mArte[1] : '');
+  /* ⚠️ E ELA TEM QUE SER PRE-CARREGADA, senao o PRIMEIRO golpe de cada sessao sai sem efeito.
+     Embutida ela chegava junto com o jogo; como arquivo, ela e uma requisicao -- e quem desenha
+     cai no `desenharGolpePixelBasico` enquanto ela nao tem `complete`.
+     ⚠️ E O SINTOMA DISSO E MUDO: o jogo continua funcionando, so sem efeito nenhum na primeira
+     batalha. Foi a conferencia de acusacao que cobrou esta linha -- tirando o pre-carregamento,
+     todas as travas acima continuavam verdes.
+     ⚠️ E ELA LE O CODIGO porque o `preloadBattleSprites` e chamado de dentro do fluxo de batalha:
+     um caso que o chamasse na mao passaria com a chamada orfa. */
+  const iPre = _idx.indexOf('function preloadBattleSprites(');
+  const corpoPre = iPre < 0 ? '' : _idx.slice(iPre, _idx.indexOf(String.fromCharCode(10) + 'function ', iPre + 1));
+  ok('    e a arte e pre-carregada quando a batalha e montada',
+     iPre > 0 && corpoPre.indexOf('obterArteDosGolpes()') > 0,
+     iPre > 0 ? '(nao achei a chamada dentro do preloadBattleSprites)' : '(nao achei a funcao)');
+  /* ⚠️ E QUEM DESENHA TEM QUE TOLERAR a arte ainda nao carregada -- e essa guarda que faz o
+     pre-carregamento ser uma OTIMIZACAO e nao um requisito. Sem ela, uma arte atrasada quebraria
+     o desenho em vez de degradar pro basico. */
+  ok('    e o desenho tolera a arte ainda nao carregada',
+     /!art\s*\|\|\s*!art\.complete\s*\|\|\s*!art\.naturalWidth/.test(_idx),
+     'a guarda do desenharGolpePixelBasico sumiu');
+}
+
 /* ⚠️ E A PASTA DAS ARTES NAO PODE IR AO AR: a raiz inteira e publicada, e `ginasios-cenarios/`
    tem 34 MB de PNG. E a mesma licao que a `previa-confusao.html` e o `preview-telas.html` ja
    custaram -- lixo publicado, achado depois do deploy. */

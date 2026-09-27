@@ -104,6 +104,20 @@ subseção e a conta continua fechando.
   intervalo devolve o comportamento velho -- foi exatamente o que aconteceu no print da Faixa.
   Conferir com o `Deploy complete!` e, na dúvida, comparar o arquivo no ar com o local
   (`curl -s https://jornadakanto.com/index.html | cmp - index.html`).
+- **⚠️ NENHUMA ARTE GRANDE DENTRO DO `index.html` (27/09/2026).** Ele vai com `no-cache` e o
+  Hosting **nunca devolve 304** pra ele, então tudo que está dentro é baixado em TODA abertura —
+  e base64 ainda infla **33%**. A arte dos efeitos de golpe (`BATTLE_ATTACK_ART`) nasceu embutida
+  com 1.480 KB: o arquivo foi a **4,61 MB**, e num 4G ruim isso são **12,1 s por abertura**.
+  Extraída pra `assets/batalha/fx-ataques.webp` ela baixa **uma vez** (`max-age=3600` + ETag) e o
+  index voltou a **2,69 MB** (7,0 s no mesmo 4G).
+  ⚠️ **O TETO DA TRAVA É 64 KB POR IMAGEM**, e ele deixa passar o que faz sentido embutido: os 16
+  sprites de líder têm ~1 KB cada, e pra eles a requisição extra custaria mais que o byte
+  economizado. O que ele pega é a **próxima arte de megabyte** — e ela entra em silêncio, porque
+  nada quebra: o jogo só fica mais lento pra todo mundo.
+  ⚠️ **E QUEM EXTRAIR TEM QUE PRÉ-CARREGAR:** embutida, a arte chegava junto com o jogo; como
+  arquivo, ela é uma requisição. O disparo mora no `preloadBattleSprites`, que roda quando o
+  resultado da batalha já foi calculado — segundos antes do primeiro golpe. E se ela não chegar a
+  tempo **nada quebra**: o desenho já cai no `desenharGolpePixelBasico` sem `complete`.
 - **⚠️ E TODA PRÉVIA QUE FICAR NA RAIZ VAI AO AR JUNTO.** Descoberto em 24/09/2026, depois de um
   deploy: a `previa-confusao.html` que eu tinha deixado ali respondia **200** em
   `jornadakanto.com/previa-confusao.html`. Não é vazamento de dado (é uma tela do jogo desenhada

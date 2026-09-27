@@ -592,6 +592,99 @@ console.log('\n=== O RANKING E O HISTÓRICO ===');
 /* ============================================================================
    10) PONTA A PONTA -- 8 inscritos entram no chaveamento, o forjado não
    ============================================================================ */
+console.log('\n=== O PAINEL INSCREVE NA TRAINERS LEAGUE (27/09/2026) ===');
+{
+  /* ⚠️ A CALLABLE DE ADMIN TEM QUE GRAVAR O MESMO QUE O JOGADOR GRAVA -- e a unica coisa que
+     importa aqui. A Trainers League le `eligibleCodes` (a lista de times aptos da CONTA) e
+     `eligibleAtaques` (um mapa especie:nivel -> golpes); faltando um deles, o time cai no motor de
+     tipo em silencio no dia da liga, e ninguem descobre ate a partida sair errada.
+     ⚠️ E ELA NAO PODE REESCREVER AS REGRAS: quem monta a lista e o
+     `trainersLeagueGatherEligibleCodesForUid`, o mesmo do jogo -- 8 insignias, nao aposentado, e a
+     ordem por SLOT (o sorteio do time de cada rodada e por INDICE nessa lista). */
+  const Module2 = require('module');
+  const fake2 = require('./fake-firestore.js');
+  const db2 = fake2.makeDb();
+  const stubs2 = {
+    'firebase-functions/v2/scheduler': { onSchedule: (a, b) => (typeof a === 'function' ? a : b) },
+    'firebase-functions/v2/https': { onCall: (fn) => fn,
+      HttpsError: class HttpsError extends Error { constructor(c, m){ super(m); this.code = c; } } },
+    'firebase-functions/logger': { error(){}, info(){}, warn(){}, log(){} },
+    'firebase-admin': { initializeApp(){}, firestore: Object.assign(() => db2, { FieldValue: fake2.FieldValue }) }
+  };
+  const load2 = Module2._load;
+  Module2._load = function(req){ if(stubs2[req]) return stubs2[req]; return load2.apply(this, arguments); };
+  delete require.cache[require.resolve(path.join(raiz, 'functions', 'index.js'))];
+  const F2 = require(path.join(raiz, 'functions', 'index.js'));
+  Module2._load = load2;
+
+  (async () => {
+    const uid = 'tre-tl';
+    await db2.collection('users').doc(uid).set({ trainerName: 'Buzzo', admin: false, specialties: ['Water'] });
+    await db2.collection('users').doc('chefe').set({ trainerName: 'Chefe', admin: true });
+    /* tres saves: um APTO, um sem as 8 insignias e um APOSENTADO */
+    const time = [{ speciesId:'gyarados', level:70, ataques:['surf'] }];
+    await db2.collection('users').doc(uid).collection('saves').doc('0')
+      .set({ team: time, badgeCount: 8, trainerName: 'Buzzo' });
+    await db2.collection('users').doc(uid).collection('saves').doc('1')
+      .set({ team: time, badgeCount: 3, trainerName: 'Buzzo' });
+    await db2.collection('users').doc(uid).collection('saves').doc('2')
+      .set({ team: time, badgeCount: 8, aposentado: true, trainerName: 'Buzzo' });
+
+    const req = { auth: { uid: 'chefe' }, data: { uid } };
+    let erro = null, res = null;
+    try { res = await F2.adminAddTrainersLeagueRegistration(req); } catch(e){ erro = e; }
+
+    ok('o painel inscreve na Trainers League', !!res && res.ok === true,
+       erro ? (erro.code + ': ' + erro.message) : JSON.stringify(res));
+    /* ⚠️ SO O SAVE APTO ENTRA: o de 3 insignias e o aposentado ficam de fora, pelas MESMAS regras
+       que o jogo aplica -- e e por reusar o `gather` que isso sai de graca. */
+    ok('  e so o time APTO entra (3 saves, 1 elegivel)', !!res && res.times === 1,
+       res ? res.times + ' time(s)' : '');
+
+    const reg = await db2.collection('trainersLeagueCycles').doc(res ? res.dateId : 'x')
+      .collection('registrants').doc(uid).get().catch(() => null);
+    const d = reg && reg.exists ? reg.data() : null;
+    ok('  e a inscricao guarda os MESMOS campos que o jogador grava',
+       !!d && Array.isArray(d.eligibleCodes) && d.eligibleCodes.length === 1
+       && d.eligibleAtaques && typeof d.eligibleAtaques === 'object'
+       && d.uid === uid && d.name === 'Buzzo',
+       d ? Object.keys(d).sort().join(', ') : '(nao gravou)');
+    /* ⚠️ AS ESPECIALIDADES ENTRAM CONGELADAS, como na inscricao do jogador: a liga do dia roda com
+       o numero da hora da inscricao. */
+    ok('  e as especialidades entram congeladas',
+       !!d && JSON.stringify(d.specialties) === JSON.stringify(['Water']),
+       d ? JSON.stringify(d.specialties) : '');
+
+    /* ⚠️ E NAO INSCREVE DUAS VEZES -- a transacao recusa, como a da Classica. */
+    let erro2 = null;
+    try { await F2.adminAddTrainersLeagueRegistration(req); } catch(e){ erro2 = e; }
+    ok('  e o segundo clique e recusado', !!erro2 && erro2.code === 'already-exists',
+       erro2 ? erro2.code : '(nao recusou)');
+
+    /* ⚠️ E QUEM NAO E ADMIN NAO PASSA: e a primeira linha da callable, e sem ela o painel inteiro
+       seria uma porta aberta -- callable e chamavel direto do console. */
+    /* ⚠️ ELA COBRA O CODIGO `permission-denied`, e nao so "deu erro" -- e o alvo e um treinador
+       AINDA NAO INSCRITO. A primeira versao usava o mesmo uid ja inscrito e checava `!!erro3`:
+       tirando o `exigeAdmin`, a chamada passava pela autorizacao e caia em `already-exists`, e a
+       trava ficava VERDE com a porta aberta. Foi a conferencia de acusacao que pegou. */
+    await db2.collection('users').doc('outro').set({ trainerName: 'Outro' });
+    await db2.collection('users').doc('outro').collection('saves').doc('0')
+      .set({ team: time, badgeCount: 8, trainerName: 'Outro' });
+    let erro3 = null;
+    try { await F2.adminAddTrainersLeagueRegistration({ auth: { uid }, data: { uid: 'outro' } }); } catch(e){ erro3 = e; }
+    ok('  e quem NAO e admin nao passa', !!erro3 && erro3.code === 'permission-denied',
+       erro3 ? erro3.code : '(passou!)');
+
+    /* ⚠️ E CONTA SEM TIME APTO E RECUSADA na origem, em vez de gravar uma inscricao vazia: um
+       inscrito com `eligibleCodes` vazio entraria no chaveamento sem time nenhum. */
+    await db2.collection('users').doc('vazio').set({ trainerName: 'Vazio' });
+    let erro4 = null;
+    try { await F2.adminAddTrainersLeagueRegistration({ auth:{ uid:'chefe' }, data:{ uid:'vazio' } }); } catch(e){ erro4 = e; }
+    ok('  e conta sem time apto e recusada', !!erro4 && erro4.code === 'failed-precondition',
+       erro4 ? erro4.code + ': ' + erro4.message.slice(0, 40) : '(passou!)');
+  })();
+}
+
 console.log('\n=== PONTA A PONTA (o drawCycle de verdade) ===');
 {
   /* ⚠️ ESTA É A TRAVA QUE PROVA A FEATURE INTEIRA: ela roda o `drawCycle` contra o Firestore em

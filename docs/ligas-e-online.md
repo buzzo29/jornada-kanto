@@ -2376,6 +2376,79 @@ MESMA função e o filtro morando num lugar só.
 **Conferido que os 5 defeitos religados acusam**, e cada um derruba a trava que descreve o que ele
 quebrou.
 
+## O PAINEL INSCREVE NA TRAINERS LEAGUE (27/09/2026)
+
+Pedido assim: *"no admin-treinadores coloque também a opção de inscrever players para a trainers
+league"*. O painel já inscrevia na **Clássica**; faltava esta.
+
+### ⚠️ É UMA CALLABLE PRÓPRIA, E NÃO UM PARÂMETRO DA QUE JÁ EXISTIA
+
+As duas ligas não se parecem, e é isso que decide o desenho:
+
+| | Clássica | Trainers League |
+|---|---|---|
+| o que entra | **UM save** escolhido | **TODOS** os times aptos da conta |
+| onde grava | registrants do **CICLO** | registrants do **DIA** (`dateId`) |
+| o campo | `code` (um) | `eligibleCodes` (lista) + `eligibleAtaques` |
+| o botão na tela | dentro do card de **cada save** | no card do **treinador** |
+
+Enfiar as duas na mesma função daria um corpo com dois caminhos que não compartilham nada além do
+`exigeAdmin` — e o próximo ajuste numa quebraria a outra em silêncio.
+
+- **⚠️ ELA REUSA O `trainersLeagueGatherEligibleCodesForUid`**, que é quem o PRÓPRIO JOGO usa: 8
+  insígnias, time montado, não aposentado, **ordem por SLOT** e os golpes lidos do save. Reescrever
+  isso seria uma segunda fonte de verdade — e a ordem, em particular, decide **qual time luta cada
+  rodada** (o sorteio é por ÍNDICE nessa lista).
+- **⚠️ AS DUAS GUARDAS DE JANELA SÃO AS MESMAS DO JOGADOR**, e são o que impede o painel de criar
+  um estado que o jogo não cria: depois do `lockTime` o chaveamento já foi montado, e um ciclo fora
+  de `registering` já saiu da fase de inscrições.
+- **As especialidades entram CONGELADAS**, como na inscrição do jogador: a liga do dia roda com o
+  número da hora da inscrição.
+- **O botão só aparece quando há time apto**, pela mesma regra do outro: oferecer uma ação que a
+  callable vai recusar é pior que não oferecer.
+
+### ⚠️ E DUAS TRAVAS MINHAS PASSARAM COM O DEFEITO RELIGADO
+
+1. **A do `exigeAdmin` checava só "deu erro".** Tirando a linha, a chamada do não-admin passava
+   pela autorização e caía em `already-exists` — porque o alvo **já tinha sido inscrito** pelo caso
+   anterior. Hoje ela cobra o código **`permission-denied`** e usa um treinador ainda não inscrito.
+   **Um erro qualquer não prova que a porta está fechada.**
+2. **A dos campos gravados lia do caminho errado** (`trainersLeague` em vez de
+   `trainersLeagueCycles`) e dizia "não gravou" com a gravação funcionando. O que denunciou foi a
+   trava vizinha: o *"segundo clique é recusado"* só passa se o primeiro **gravou**.
+
+**Conferido: os 6 defeitos religados acusam** — sem `exigeAdmin`, sem `eligibleAtaques`, aceitando
+conta sem time, reescrevendo a regra em vez de reusar o gather, sem recusar duplicata, e sem
+congelar as especialidades.
+
+⚠️ **E a trava das 84 callables fez o trabalho dela:** a nova caiu fora das duas listas do
+`test-convidado` e ficou barulhenta na hora. Ela entrou em **LIVRES**, junto das outras de admin —
+o `exigeAdmin` já as barra, e o `exigeCadastro` ali seria redundante.
+
+## O POLL DA CLÁSSICA FICOU ADAPTATIVO (27/09/2026)
+
+Relatado como *"lentidão na hora de se inscrever nas ligas"*. **A inscrição em si estava no
+mínimo** — o conserto de 16/09 (6→3 idas) continua valendo, e a trava confirma. O que estava solto
+era o **polling**.
+
+| | operações | níveis | ~tempo em nam5 |
+|---|---|---|---|
+| até a tela dizer "Inscrito!" | 3 | 3 | ~600 ms |
+| abrir a tela — até ela aparecer | — | 4 | ~800 ms |
+| **um tique do polling (a cada 5 s)** | **5** | 3 | **3.600 leituras/hora, por aba** |
+
+**⚠️ O CLAUDE.md ESTIMAVA "~2 leituras por tique" E ESTAVA DESATUALIZADO** — são 5.
+
+A Trainers League já tinha poll adaptativo (15 s em `registering`, 30 s em `complete`, 5 s só com o
+chaveamento correndo); a Clássica ficou sem, **e é ela a tela onde o jogador espera a inscrição
+fechar**. Com o mesmo tratamento: **3.600 → 600 leituras/hora**, 6× menos.
+
+- **Chamada explícita nunca pula** — abrir, inscrever, cancelar leem na hora. O pulo corta só o
+  tique automático.
+- **⚠️ E DUAS TRAVAS MEDIAM A FUNÇÃO, NÃO O CAMINHO:** religando o defeito, elas passavam verdes.
+  Hoje uma delas **lê o código** pra cobrar que o tique de 5 s passa o `fromPoll` — ele roda por
+  `setInterval` e o teste não o dispara. **3 de 3 defeitos acusam.**
+
 ## PERFORMANCE: A GEOGRAFIA MANDA (19/09/2026)
 
 Relatado assim: *"tenho sentido uma boa lentidão na inscrição para as ligas clássicas e trainers

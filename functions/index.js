@@ -6543,6 +6543,72 @@ exports.adminAddLeagueRegistration = onCall(async (request) => {
   return { ok: true, uid: alvo, slot, nome, cycleId: ciclo.id, contador };
 });
 
+/* ⚠️ INSCREVER NA TRAINERS LEAGUE PELO PAINEL (27/09/2026, a pedido). Ela e uma callable PROPRIA e
+   nao um parametro da `adminAddLeagueRegistration`, e a razao e que as duas ligas nao se parecem:
+
+     | | Classica | Trainers League |
+     | o que entra | UM save escolhido | TODOS os times aptos da conta |
+     | onde grava | registrants do CICLO | registrants do DIA (dateId) |
+     | o campo | `code` (um) | `eligibleCodes` (lista) |
+
+   Enfiar as duas na mesma funcao daria um corpo com dois caminhos que nao compartilham nada alem
+   do `exigeAdmin` -- e o proximo ajuste numa quebraria a outra em silencio.
+
+   ⚠️ E ELA REUSA O `trainersLeagueGatherEligibleCodesForUid`, que e quem o PROPRIO JOGO usa pra
+   montar a lista: 8 insignias, time montado, nao aposentado, ordem por SLOT e os golpes lidos do
+   save. Reescrever essas regras aqui seria uma segunda fonte de verdade -- e a ordem, em
+   particular, decide qual time luta cada rodada (o sorteio e por INDICE nessa lista).
+
+   ⚠️ AS DUAS GUARDAS DE JANELA SAO AS MESMAS DO JOGADOR, e sao o que impede o painel de criar um
+   estado que o jogo nao cria: depois do `lockTime` o chaveamento ja foi montado (entrar ali poria
+   um inscrito numa liga ja sorteada), e antes de a liga do dia anterior terminar as inscricoes nem
+   abriram. */
+exports.adminAddTrainersLeagueRegistration = onCall(async (request) => {
+  await exigeAdmin(request);
+  const alvo = String((request.data || {}).uid || '').trim();
+  if(!alvo) throw new HttpsError('invalid-argument', 'Informe o treinador.');
+
+  const dateId = trainersLeagueTodayDateStr();
+  const agora = Date.now();
+  const lockTime = trainersLeagueTimeOnDate(dateId, TRAINERS_LEAGUE_LOCK_HOUR, TRAINERS_LEAGUE_LOCK_MIN);
+  if(agora >= lockTime) throw new HttpsError('failed-precondition', 'As inscricoes de hoje ja se encerraram.');
+
+  /* ⚠️ O NOME VEM DA CONTA, como na Classica: sem ele a linha do chaveamento sai vazia. */
+  const conta = await db.collection('users').doc(alvo).get();
+  const cd = conta.exists ? (conta.data() || {}) : {};
+  const nome = String(cd.trainerName || '').trim();
+  if(!nome) throw new HttpsError('failed-precondition', 'Esse treinador nao tem nome definido.');
+
+  const codes = await trainersLeagueGatherEligibleCodesForUid(alvo);
+  if(!codes.length) throw new HttpsError('failed-precondition',
+    'Esse treinador nao tem nenhum time com as 8 insignias (ou todos estao aposentados).');
+
+  await trainersLeagueEnsureCycleDoc(dateId);
+  /* ⚠️ E O STATUS DO CICLO E CONFERIDO DEPOIS DE GARANTIR QUE ELE EXISTE: so `registering` aceita
+     inscrito. Um ciclo em `locking`/`locked`/`active` ja montou (ou esta montando) o chaveamento. */
+  const cicloSnap = await trainersLeagueCycleRef(dateId).get();
+  const st = cicloSnap.exists ? (cicloSnap.data() || {}).status : null;
+  if(st && st !== 'registering') throw new HttpsError('failed-precondition',
+    'A liga de hoje ja saiu da fase de inscricoes (' + st + ').');
+
+  const ref = trainersLeagueRegistrantRef(dateId, alvo);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if(snap.exists) throw new HttpsError('already-exists', 'Esse treinador ja esta inscrito na Trainers League de hoje.');
+    /* ⚠️ OS CAMPOS SAO OS MESMOS QUE O JOGADOR GRAVA, um a um -- inclusive as especialidades
+       CONGELADAS: a liga do dia roda com o numero da hora da inscricao, entao subir de especialista
+       no meio do campeonato nao muda partidas ja agendadas. */
+    tx.set(ref, { uid: alvo, name: nome, eligibleCodes: codes.slice(),
+                  eligibleAtaques: codes.ataques || {},
+                  specialties: Array.isArray(cd.specialties) ? cd.specialties : [],
+                  elite: !!cd.accountEliteChampion, registeredAt: Date.now() });
+  });
+
+  const cont = await trainersLeagueRegistrantsRef(dateId).count().get().catch(() => null);
+  return { ok: true, uid: alvo, nome, dateId, times: codes.length,
+           contador: cont ? cont.data().count : null };
+});
+
 exports.adminRemoveLeagueRegistration = onCall(async (request) => {
   await exigeAdmin(request);
   const alvo = String((request.data || {}).uid || '').trim();

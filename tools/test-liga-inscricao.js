@@ -366,6 +366,73 @@ console.log('\nOS QUADROS QUE ABREM E FECHAM (17/09/2026)');
   }
 }
 
+console.log('\nO POLL DA CLASSICA E ADAPTATIVO (27/09/2026)');
+{
+  /* ⚠️ O TIQUE RODA A CADA 5s e MEDIDO custa 5 leituras -- 3.600 por HORA, por aba. Nem toda fase
+     precisa disso: em `registering` o que muda e o contador de inscritos, e em `complete` nada muda
+     mais. A Trainers League ja tinha os mesmos 15s/30s; a Classica ficou sem, e e ela a tela onde o
+     jogador passa o tempo esperando a inscricao fechar.
+     ⚠️ A TRAVA E DE CONTAGEM, como a das idas ao lado: ela conta LEITURAS em 6 tiques com o relogio
+     andando, porque o que decide o custo e quantos tiques realmente vao ao servidor. */
+  const S3 = createSandbox();
+  const g3 = S3.__getGame();
+  let leituras = 0;
+  const doc3 = (c) => ({ __p:c, collection(n){ return doc3(c+'/'+n); }, doc(i){ return doc3(c+'/'+i); },
+    where(){ return this; }, orderBy(){ return this; }, limit(){ return this; },
+    get(){ leituras++; return Promise.resolve({ exists:true, empty:true, docs:[], forEach(){},
+      data:()=>({ cycles:[{ id:'agora', status:'registering', scheduledTime:1 }] }) }); },
+    set(){ return Promise.resolve(); }, onSnapshot(){ return ()=>{}; } });
+  S3.db = { collection(n){ return doc3(n); },
+    runTransaction(f){ return Promise.resolve(f({ get:()=>Promise.resolve({ exists:false, data:()=>({}) }), set(){} })); } };
+  g3.authUser = { uid:'u1' }; g3.trainerName = 'Buzzo'; g3.screen = 'league';
+  g3.currentLeagueTypeId = S3.CLASSIC_LEAGUE_TYPE;
+  S3.__setGame(g3);
+  S3.render = () => {};
+  {
+    const real = Date.now; const t0 = real();
+    /* a primeira e EXPLICITA (a abertura da tela) e nunca pula */
+    await S3.refreshLeagueView(S3.CLASSIC_LEAGUE_TYPE, false);
+    const naAbertura = leituras;
+    leituras = 0;
+    for(let k = 1; k <= 6; k++){
+      Date.now = () => t0 + k * 5000;
+      await S3.refreshLeagueView(S3.CLASSIC_LEAGUE_TYPE, false, true);
+    }
+    Date.now = real;
+    /* em 30s de `registering` (gap de 15s) cabem 2 tiques, nao 6 */
+    ok('6 tiques em 30s nao custam 6 rodadas de leitura', leituras < naAbertura * 6,
+       leituras + ' leituras em 6 tiques (a abertura sozinha custa ' + naAbertura + ')');
+    /* ⚠️ A CHAMADA EXPLICITA NUNCA PULA, e a trava tem que provar isso DEPOIS de um tique recente:
+       medindo so a abertura ela passaria de qualquer jeito (ali `leagueData` ainda e null, entao
+       nao ha o que pular). Foi a conferencia de acusacao que cobrou -- tirando o `fromPoll` da
+       guarda, a versao antiga desta trava continuava verde. */
+    Date.now = () => t0 + 6 * 5000 + 1000;   // 1s depois do ultimo tique: um tique pularia
+    leituras = 0;
+    await S3.refreshLeagueView(S3.CLASSIC_LEAGUE_TYPE, false, true);
+    const doTiqueCedo = leituras;
+    leituras = 0;
+    await S3.refreshLeagueView(S3.CLASSIC_LEAGUE_TYPE, false);   // EXPLICITA, no mesmo instante
+    ok('  o tique pula quando e cedo demais', doTiqueCedo === 0, doTiqueCedo + ' leituras');
+    ok('  mas a chamada EXPLICITA le na hora', leituras > 0, leituras + ' leituras');
+    /* ⚠️ E O TIQUE DE VERDADE TEM QUE PASSAR O `fromPoll` -- isto e lido do CODIGO, porque o
+       `startLeagueListener` roda por `setInterval` e o teste nao o dispara. Sem esta linha, tirar o
+       terceiro argumento do tique deixava tudo verde: a guarda continuaria existindo e nunca sendo
+       usada, que e o jeito mudo de a otimizacao sumir. */
+    const _fsP = require('fs');
+    const _srcP = _fsP.readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
+    const iL = _srcP.indexOf('function startLeagueListener(');
+    const corpoListener = _srcP.slice(iL, _srcP.indexOf('function stopLeaguePolling', iL));
+    ok('  e o tique de 5s passa o fromPoll',
+       /refreshLeagueView\([^)]*,\s*false\s*,\s*true\s*\)/.test(corpoListener),
+       (corpoListener.match(/refreshLeagueView\([^)]*\)/) || ['(nao achei a chamada)'])[0]);
+    /* ⚠️ E O GAP SAI DE UMA TABELA, nao de numeros soltos -- a fase ATIVA continua em 5s, que e a
+       unica em que o chaveamento muda de verdade. */
+    ok('  e a fase ATIVA nao tem gap (continua em 5s)',
+       !S3.LIGA_POLL_MIN_GAP['advancing'] && !S3.LIGA_POLL_MIN_GAP['drawn'],
+       JSON.stringify(S3.LIGA_POLL_MIN_GAP));
+  }
+}
+
 console.log('\nO CLIQUE EM INSCREVER NAO PODE VOLTAR A CUSTAR SEIS IDAS');
 {
   const S2 = createSandbox();          // sandbox proprio: o de cima tem os colaboradores trocados
