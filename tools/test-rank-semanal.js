@@ -239,35 +239,26 @@ console.log('\n=== O CRON FECHA A ANTERIOR, NUNCA A CORRENTE ===');
   ok('ele varre ' + S.RANK_SEMANAS_A_FECHAR + ' semanas pra trás', S.RANK_SEMANAS_A_FECHAR >= 2);
 }
 
-console.log('\n=== A CÓPIA INICIAL ===');
+console.log('\n=== A SEMANA NOVA NASCE VAZIA (28/09/2026) ===');
 {
-  const sem = S.semanaDoRanking();
-  /* a Dani só tem recorde de SEMPRE; o Élio já jogou nesta semana, com placar MENOR */
-  await db.collection('rescueRanking').doc('dani').set({ uid: 'dani', nome: 'Dani', pontos: 1000 });
-  await db.collection('rescueRanking').doc('elio').set({ uid: 'elio', nome: 'Elio', pontos: 800 });
-  await semana('rescueRanking', sem, 'elio').set({ uid: 'elio', nome: 'Elio', pontos: 300, semanaId: sem });
-  await S.copiarGeralParaASemana();
-  ok('quem só tinha o de sempre foi copiado', ((await semana('rescueRanking', sem, 'dani').get()).data()||{}).pontos === 1000);
-  /* ⚠️ E QUEM JÁ JOGOU NESTA SEMANA NÃO É REESCRITO: o placar da semana é dele, e o do geral pode
-     ser de um dia anterior -- reescrevendo, a cópia apagaria um recorde novo com o valor antigo. */
-  ok('  e quem já jogou na semana FICOU com o dele', ((await semana('rescueRanking', sem, 'elio').get()).data()||{}).pontos === 300,
-     String(((await semana('rescueRanking', sem, 'elio').get()).data()||{}).pontos));
-  /* ⚠️ E ELA RODA UMA VEZ SÓ: o cron passa de hora em hora, e sem a marca cada volta reescreveria
-     os placares -- inclusive por cima de um recorde novo, com o valor velho do geral. */
-  await semana('rescueRanking', sem, 'dani').set({ uid: 'dani', nome: 'Dani', pontos: 1500, semanaId: sem });
-  await S.copiarGeralParaASemana();
-  ok('rodar de novo não mexe em nada', ((await semana('rescueRanking', sem, 'dani').get()).data()||{}).pontos === 1500,
-     String(((await semana('rescueRanking', sem, 'dani').get()).data()||{}).pontos));
-  const marca = (await S.rankSemanaDocRef('rescueRanking', sem).get()).data() || {};
-  ok('  e a marca ficou no documento da semana', marca.copiado === true);
-  /* ⚠️ E A MARCA É O QUE FAZ ELA RODAR UMA VEZ SÓ -- as duas guardas (ela e o `if(ja.exists)`)
-     protegem o DADO igual, então só isto distingue as duas: quem entra no geral DEPOIS da cópia
-     não é copiado. É o que impede o cron de varrer as três coleções inteiras de hora em hora.
-     ⚠️ E não é buraco: quem faz um placar de sempre novo o fez JOGANDO, e o envio grava nos dois. */
-  await db.collection('rescueRanking').doc('fabio').set({ uid: 'fabio', nome: 'Fabio', pontos: 1234 });
-  await S.copiarGeralParaASemana();
-  ok('  e quem entrou no geral DEPOIS dela não é copiado',
-     !(await semana('rescueRanking', sem, 'fabio').get()).exists);
+  /* ⚠️ AQUI HAVIA A TRAVA DA COPIA INICIAL, e ela virou o CONTRARIO -- porque a copia era o
+     defeito. Ela nasceu em 23/09 como migracao de uma vez, mas a marca era por SEMANA: ela
+     rodava TODA SEGUNDA e despejava o quadro de TODOS OS TEMPOS dentro da semana recem-nascida.
+     Relatado em 28/09 (o ranking da semana continua os valores da semana passada -- eram os de
+     SEMPRE), e o log do cron confirmou: fishingRanking/2026-09-28, 10 copiados do geral.
+     ⚠️ E O ESTRAGO NAO ERA SO VISUAL: a semana anterior tambem nasceu copiada, entao o PODIO e
+     os PREMIOS dela foram pros lideres de sempre, e nao pra quem se destacou na semana. */
+  const semNova = S.semanaDoRanking();
+  await db.collection('fishingRanking').doc('lenda').set({ uid:'lenda', nome:'Lenda', pontos: 9999 });
+  await S.fecharSemanasPendentes();   /* o cron inteiro, como ele roda de verdade */
+  const naSemana = await S.rankSemanaPlayersRef('fishingRanking', semNova).get();
+  ok('o recordista DE SEMPRE nao aparece na semana nova',
+     !naSemana.docs.some(d => d.id === 'lenda'),
+     naSemana.docs.map(d => d.id).join(', ') || '(vazia)');
+  /* ⚠️ E A FUNCAO NAO EXISTE MAIS: consertar a marca deixaria uma copia uma-vez-na-vida -- uma
+     funcao que nunca mais roda, do tipo que fica anos no arquivo sem ninguem saber que morreu. */
+  ok('  e a copiarGeralParaASemana nao existe mais', typeof S.copiarGeralParaASemana === 'undefined');
+  ok('  e o cron nao a chama', SRV.indexOf('await copiarGeralParaASemana()') < 0);
 }
 
 console.log('\n=== O SERVIDOR: as listas e as portas (lendo o código) ===');
@@ -323,11 +314,11 @@ console.log('\n=== O SERVIDOR: as listas e as portas (lendo o código) ===');
   }
   /* ⚠️ O CRON CHAMA AS DUAS, E A CÓPIA VEM ANTES: os casos chamam as funções na mão e passariam
      com a chamada órfã -- a mesma trava que o `applySpecialtyBuff` e o `equiparItens` já têm. */
-  const iCopia = SRV.indexOf('await copiarGeralParaASemana()');
-  const iFecha = SRV.indexOf('await fecharSemanasPendentes()');
-  ok('o cron chama a cópia', iCopia > 0);
-  ok('o cron chama o fechamento', iFecha > 0);
-  ok('  e a cópia vem ANTES', iCopia > 0 && iFecha > iCopia, iCopia + ' < ' + iFecha);
+  /* ⚠️ A TRAVA DA CÓPIA VIROU A DA AUSÊNCIA DELA (28/09/2026): ela cobrava que o cron chamasse a
+     `copiarGeralParaASemana` e que ela viesse ANTES do fechamento -- e a cópia era o defeito
+     (ver **A SEMANA NOVA NASCE VAZIA**, mais acima). */
+  ok('o cron chama o fechamento', SRV.indexOf('await fecharSemanasPendentes()') > 0);
+  ok('  e NÃO chama mais a cópia inicial', SRV.indexOf('await copiarGeralParaASemana()') < 0);
   /* ⚠️ E A MARCA `awarded` É ESCRITA POR ÚLTIMO: marcada antes, um erro no meio do laço apagaria o
      resto do pódio pra sempre -- a volta seguinte do cron veria a marca e iria embora. */
   const corpo = SRV.slice(SRV.indexOf('async function fecharSemanaDoRanking('));
@@ -582,29 +573,42 @@ console.log('\n=== E O POPUP NA TELA DAS ILHAS ===');
      && S3.renderIlhasResumoModal() === '',
      String(S3.game.ilhasResumoVisto));
 
-  /* ⚠️ E O MODAL VEM POR ÚLTIMO no renderIlhas: os modais empilham na ordem em que entram, e este
-     é o que BLOQUEIA -- vindo antes, o (i) de uma ilha abriria por cima dele. */
+  /* ============================================================================
+     ⚠️ O MODAL MUDOU DE TELA EM 28/09/2026: ele nasceu na tela-hub das Ilhas e foi pra HOME, a
+     pedido -- *"não apareceu aquele modal no home"*. Eu tinha lido o "quando os usuários entrarem
+     ... ver essa tela" do pedido original como sendo a tela das Ilhas.
+     ⚠️ E O GATILHO DAS ILHAS SAIU JUNTO, em vez de ficar de reserva: passa-se pela home ANTES de
+     chegar nelas, sempre -- então ele nunca dispararia. Estas travas cobram os DOIS lados (está
+     na home E não está mais nas Ilhas), porque metade disso é o que o relato pegou.
+     ============================================================================ */
   const iR = HTML.indexOf('function renderIlhas(');
   const corpoI = HTML.slice(iR, HTML.indexOf('\n}', iR));
   ok('  (a fatia do renderIlhas tem o que ler)', corpoI.length > 300, String(corpoI.length));
-  ok('o modal do pódio vem DEPOIS do modal da ilha',
-     corpoI.indexOf('renderIlhasResumoModal()') > corpoI.indexOf('renderIlhaInfoModal()'),
-     corpoI.indexOf('renderIlhaInfoModal()') + ' < ' + corpoI.indexOf('renderIlhasResumoModal()'));
-
-  /* ⚠️ O `abrirIlhas` PERGUNTA, e os casos acima chamam a função na mão -- passariam com a chamada
-     órfã. É a mesma trava que o `applySpecialtyBuff` e o `repararEvolucoesAtrasadas` já têm. */
+  ok('o modal NÃO está mais na tela das Ilhas', corpoI.indexOf('renderIlhasResumoModal()') < 0);
   const iA = HTML.indexOf('function abrirIlhas(');
   const corpoA = HTML.slice(iA, HTML.indexOf('\n}', iA));
-  ok('o abrirIlhas chama o conferirResumoDasIlhas', corpoA.indexOf('conferirResumoDasIlhas()') > 0);
-  /* ⚠️ E DEPOIS DO `render()`: a tela não pode esperar uma ida ao servidor pra aparecer. */
-  ok('  e DEPOIS do render()', corpoA.indexOf('conferirResumoDasIlhas()') > corpoA.indexOf('render();'));
+  ok('  e o abrirIlhas não o chama mais', corpoA.indexOf('conferirResumoDasIlhas()') < 0);
 
-  /* ⚠️ O `render()` SÓ NA TELA DAS ILHAS: a resposta chega por promessa e o jogador pode estar
-     dentro de um minigame -- um render() ali mata a animação em curso, a regra da casa. */
+  /* ⚠️ E ELE ESTÁ NA HOME, nos DOIS pontos que ela precisa: o gatilho (no carregamento da conta,
+     ao lado do `conferirNovidades` -- ali o `ilhasResumoVisto` já foi lido) e a pilha de modais. */
+  const iL = HTML.indexOf('conferirNovidades();');
+  ok('a home CHAMA o conferirResumoDasIlhas no carregamento da conta',
+     iL > 0 && HTML.indexOf('conferirResumoDasIlhas();', iL) > 0
+     && HTML.indexOf('conferirResumoDasIlhas();', iL) - iL < 600);
+  ok('  e o modal entra na pilha de modais da home',
+     /if\(game\.ilhasResumo\)\{ html \+= renderIlhasResumoModal\(\); \}/.test(HTML));
+
   const iC = HTML.indexOf('async function conferirResumoDasIlhas(');
   const corpoC = HTML.slice(iC, HTML.indexOf('\n}', iC));
+  /* ⚠️ A GUARDA DE TELA É A HOME, e o `contaCarregada` vem junto: sem ele o `ilhasResumoVisto` é
+     `undefined` no primeiro desenho e o modal reabriria pra quem já fechou -- a mesma lição que o
+     `conferirNovidades` já carrega. */
+  ok('  e ele só roda na HOME', /game\.screen !== 'saveSelect'/.test(corpoC));
+  ok('    e só depois de a conta carregar', /game\.contaCarregada/.test(corpoC));
+  /* ⚠️ E O `render()` SÓ NA HOME: a resposta chega por promessa e o jogador pode já ter saído --
+     um render() no meio de uma animação mata a transição, a regra da casa. */
   ok('  e o render() do conferir é guardado pela tela',
-     /if\(game\.screen === 'ilhas'\) render\(\)/.test(corpoC));
+     /if\(game\.screen === 'saveSelect'\) render\(\)/.test(corpoC));
   ok('  e ele pergunta UMA vez por sessão', corpoC.indexOf('game.ilhasResumoPedido') > 0);
 
   /* ⚠️ OS TRÊS CAMPOS ESTÃO NO CAMPOS_DA_CONTA: sem eles o resetGame os apagaria ao abrir um save,

@@ -145,14 +145,15 @@ function ok(titulo, cond, extra){
      texto genérico diria "com 12 pontos" onde o certo é "no nível 12". */
   ok('  e a UNIDADE dela é o nível (os outros quatro medem placar)',
      !!arena[0] && arena[0].unidade === 'nivel', arena[0] ? String(arena[0].unidade) : '-');
-  /* ⚠️ E ELA NÃO ENTRA NA CÓPIA INICIAL: ela não TEM coleção de sempre pra copiar. Aquela lista é
-     escrita à mão de propósito -- derivada do RANKS_SEMANAIS, a Arena entraria e o cron marcaria
-     `copiado: true` sobre uma coleção que não existe. */
+  /* ⚠️ ESTA TRAVA COBRAVA QUE A ARENA FICASSE FORA DA CÓPIA INICIAL (ela não TEM coleção de
+     sempre pra copiar). Em 28/09/2026 a cópia foi REMOVIDA inteira -- ela era uma migração de uma
+     vez cuja marca era por SEMANA, então ela re-rodava toda segunda e despejava o quadro de todos
+     os tempos dentro da semana recém-nascida (ver o test-rank-semanal). Hoje a regra é mais forte
+     que a que esta linha cobrava: NINGUÉM é pré-preenchido, porque a cópia não existe. */
   const fonteCopia = fs.readFileSync(path.join(raiz, 'functions', 'index.js'), 'utf8');
-  const listaCopia = (fonteCopia.match(/for\(const base of \[([^\]]*)\]\)/) || [, ''])[1];
-  ok('  e ela NÃO entra na cópia inicial (não há coleção de sempre pra copiar)',
-     listaCopia.indexOf('arenaRanking') < 0 && listaCopia.indexOf('fishingRanking') >= 0,
-     listaCopia.replace(/['\s]/g, ''));
+  ok('  e a cópia inicial não existe mais (ninguém é pré-preenchido)',
+     fonteCopia.indexOf('async function copiarGeralParaASemana') < 0
+     && fonteCopia.indexOf('await copiarGeralParaASemana()') < 0);
 
   /* o fechamento de verdade, com três níveis distintos */
   const semAnterior = RS.semanaDoRanking(Date.now() - 7 * 864e5);

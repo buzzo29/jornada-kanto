@@ -6406,40 +6406,31 @@ exports.getIslandsWeeklyPodium = onCall(async (request) => {
 /* ⚠️ VARRE AS ULTIMAS SEMANAS em vez de so a anterior, pela mesma razao da Torre: uma semana que
    nao fecha e um premio que ninguem recebe, e o unico jeito de perceber seria alguem reclamar.
    Da mais VELHA pra a mais nova, pras notificacoes chegarem na ordem em que as semanas passaram. */
-/* ⚠️ A COPIA INICIAL (23/09/2026, a pedido: *"pode copiar os dois igual, porque como começou antes
-   de ontem, só teve essa semana"*). Os tres jogos nasceram ha poucos dias, entao TODO recorde de
-   sempre e tambem desta semana -- e sem a copia a aba da semana abriria VAZIA pra todo mundo no
-   dia do deploy, o que se leria como o ranking ter sido apagado.
-   ⚠️ ELA RODA UMA VEZ SO, e a marca e o proprio documento da semana (`copiado`): o cron passa de
-   hora em hora, e sem ela cada volta reescreveria os placares -- inclusive por CIMA de um recorde
-   novo que alguem tivesse feito no meio-tempo, com o valor antigo do geral.
-   ⚠️ E ELA SO COPIA A SEMANA CORRENTE. Semana passada nao tem o que copiar: o geral nao guarda
-   QUANDO cada recorde foi feito por semana, entao espalhar o de sempre pelas anteriores inventaria
-   um passado que nao aconteceu -- e pagaria premio por ele. */
-async function copiarGeralParaASemana(){
-  const semanaId = semanaDoRanking();
-  for(const base of ['fishingRanking', 'rescueRanking', 'raceRanking']){
-    const semRef = rankSemanaDocRef(base, semanaId);
-    try{
-      const marca = await semRef.get();
-      if(marca.exists && marca.data().copiado) continue;
-      const geral = await db.collection(base).get();
-      let n = 0;
-      for(const d of geral.docs){
-        const dados = d.data() || {};
-        /* ⚠️ `create`-like: quem JA jogou nesta semana tem placar proprio, e ele manda -- o do
-           geral pode ser de um dia anterior. Por isso a copia so preenche quem nao esta la. */
-        const alvo = rankSemanaPlayersRef(base, semanaId).doc(d.id);
-        const ja = await alvo.get();
-        if(ja.exists) continue;
-        await alvo.set({ ...dados, semanaId });
-        n++;
-      }
-      await semRef.set({ copiado: true, copiadoEm: Date.now(), copiados: n }, { merge: true });
-      if(n) logger.info('Ranking semanal ' + base + '/' + semanaId + ': ' + n + ' copiado(s) do geral.');
-    } catch(e){ logger.error('Falha ao copiar o ranking ' + base + ' para a semana ' + semanaId, e); }
-  }
-}
+/* ============================================================================
+   ⚠️ AQUI MORAVA A COPIA INICIAL, E ELA FOI REMOVIDA EM 28/09/2026 -- este comentario fica porque
+   a razao importa mais que o codigo.
+
+   Ela nasceu em 23/09 como MIGRACAO de uma vez: os tres jogos tinham dias de vida, entao todo
+   recorde de sempre era tambem daquela semana, e sem a copia a aba nova abriria VAZIA pra todo
+   mundo no dia do deploy -- o que se leria como o ranking ter sido apagado.
+
+   ⚠️ O DEFEITO E QUE A MARCA DELA ERA POR SEMANA (`copiado`, no documento da semana). Com isso ela
+   nao rodava "uma vez": ela rodava UMA VEZ POR SEMANA -- e toda segunda-feira despejava o quadro
+   de TODOS OS TEMPOS dentro da semana recem-nascida.
+
+   RELATADO em 28/09: *"o ranking da semana dentro de cada ilha continua os valores da semana
+   passada"*. Nao eram os da semana passada: eram os DE SEMPRE. O log do cron daquela manha diz
+   tudo -- "fishingRanking/2026-09-28: 10 copiado(s) do geral", e o mesmo pros outros dois.
+
+   ⚠️ E O ESTRAGO NAO ERA SO VISUAL: a semana 2026-09-21 tambem nasceu copiada, entao o PODIO dela
+   -- e os premios pagos por ele -- eram os lideres DE SEMPRE, e nao quem se destacou na semana.
+   Um ranking semanal pre-preenchido com o de sempre nao mede a semana; ele mede o de sempre.
+
+   ⚠️ E POR QUE REMOVER EM VEZ DE CONSERTAR A MARCA: a migracao JA ACONTECEU. Uma copia "uma vez
+   na vida" e uma funcao que nunca mais roda -- do tipo que fica anos no arquivo sem ninguem saber
+   que esta morta. E semana nova DEVE nascer vazia: e isso que "ranking semanal" quer dizer, e a
+   tela ja tem a frase pra esse estado ("ninguem pontuou NESTA SEMANA ainda").
+   ============================================================================ */
 async function fecharSemanasPendentes(){
   const atual = semanaDoRanking();
   for(let i = RANK_SEMANAS_A_FECHAR; i >= 1; i--){
@@ -6451,7 +6442,6 @@ async function fecharSemanasPendentes(){
   }
 }
 exports._rankSemanal = { semanaDoRanking, fecharSemanaDoRanking, fecharSemanasPendentes,
-                         copiarGeralParaASemana,
                          RANKS_SEMANAIS, RANK_SEMANAL_PREMIOS, RANK_SEMANAS_A_FECHAR,
                          gravarRankPontos, gravarRankTempo, rankSemanaPlayersRef, rankSemanaDocRef };
 /* ⚠️ UM LEITOR SO PRO GERAL E PRO SEMANAL: `semanaId` nulo le a colecao de sempre, preenchido le a
@@ -9003,7 +8993,8 @@ exports.generateTrainerTower = onSchedule('every 60 minutes', async () => {
   /* ⚠️ A COPIA VEM ANTES DO FECHAMENTO, e a ordem importa: ela so mexe na semana CORRENTE e o
      fechamento so mexe nas anteriores, entao os dois nunca se cruzam -- mas invertida, uma semana
      que virasse no meio da passada teria o fechamento rodando sobre uma lista ainda vazia. */
-  await copiarGeralParaASemana().catch(e => logger.error('Falha ao copiar o ranking para a semana', e));
+  /* ⚠️ A `copiarGeralParaASemana` era chamada AQUI e saiu em 28/09/2026 -- ver o porque no lugar
+     onde ela morava. Semana nova nasce VAZIA, que e o que "ranking semanal" quer dizer. */
   await fecharSemanasPendentes().catch(e => logger.error('Falha ao fechar as semanas do ranking', e));
   return null;
 });

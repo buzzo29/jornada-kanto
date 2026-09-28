@@ -9521,6 +9521,10 @@ async function loadPermanentUserData(){
        ele mora aqui e não no `openSaveSelect`: ali os dois ainda não existem. Quem redesenha é o
        `.then()` do `Promise.all` da home, que já chama `render()` quando a tela é a home. */
     conferirNovidades();
+    /* ⚠️ AQUI PELO MESMO MOTIVO do `conferirNovidades`: ele pergunta o `ilhasResumoVisto`, que só
+       existe depois desta leitura -- no `openSaveSelect` ele ainda é `undefined` e o modal
+       reabriria pra quem já fechou. */
+    conferirResumoDasIlhas();
   } catch(e){ console.error('Erro ao carregar dados permanentes da conta:', e); }
 }
 /* ⚠️ O PREMIO DO CAMPEAO NAO E O MESMO EM TODA LIGA, e quem responde isso e UMA funcao. A
@@ -39922,9 +39926,6 @@ function abrirIlhas(){
   game.modoBloqueado = null;
   game.screen = 'ilhas';
   render();
-  /* ⚠️ DEPOIS do `render()`, e sem `await`: a tela não pode esperar uma ida ao servidor pra
-     aparecer. Quando a resposta chega ela mesma redesenha, e só se o jogador ainda estiver aqui. */
-  conferirResumoDasIlhas();
 }
 /* ⚠️ A SAÍDA DEPENDE DE COMO SE ENTROU: pelo botão da home ela volta pra home; pela JORNADA ela
    volta pra jornada -- devolver o jogador à home no meio de um trecho seria tirá-lo da partida.
@@ -40103,10 +40104,7 @@ function renderIlhas(){
   <button class="btn" onclick="sairDasIlhas()">${naJornadaDasIlhas()
     ? (ilhasFechouTudo() ? 'Receber o prêmio e seguir ➜' : '⬅ Encerrar a travessia e seguir')
     : '⬅ Voltar'}</button>
-  ${renderIlhaInfoModal()}
-  ${/* ⚠️ O PÓDIO VEM POR ÚLTIMO de propósito: os modais empilham na ordem em que entram, e este
-       é o que BLOQUEIA -- vindo antes, o (i) de uma ilha abriria por cima dele. */''}
-  ${renderIlhasResumoModal()}`;
+  ${renderIlhaInfoModal()}`;
 }
 
 /* ============================================================================
@@ -40129,6 +40127,15 @@ function renderIlhas(){
    nasce quando ele voltar pro mapa, porque é o `renderIlhas` que o desenha.
    ============================================================================ */
 async function conferirResumoDasIlhas(){
+  /* ⚠️ A GUARDA É A HOME (28/09/2026, a pedido). Ele nasceu na tela-hub das Ilhas -- eu li o
+     "quando os usuários entrarem ... ver essa tela" do pedido como sendo a delas --, e o relato
+     desfez isso: *"não apareceu aquele modal no home"*. A home é onde todo mundo cai, e é de onde
+     ele já teria aparecido antes de a pessoa chegar nas Ilhas.
+     ⚠️ E O GATILHO DAS ILHAS SAIU JUNTO, em vez de ficar de reserva: passa-se pela home ANTES de
+     chegar nelas, sempre -- então ele nunca dispararia, e dois gatilhos pro mesmo modal (com uma
+     marca só) é o tipo de coisa que engana quem for mexer depois. */
+  if(game.screen !== 'saveSelect') return;
+  if(!game.contaCarregada) return;
   if(game.ilhasResumoPedido) return;
   if(!game.authUser || typeof functionsClient === 'undefined' || !functionsClient) return;
   game.ilhasResumoPedido = true;
@@ -40140,7 +40147,7 @@ async function conferirResumoDasIlhas(){
     if(!d.pronto || d.visto) return;
     if(game.ilhasResumoVisto === d.semanaId) return;
     game.ilhasResumo = d;
-    if(game.screen === 'ilhas') render();
+    if(game.screen === 'saveSelect') render();
   }catch(e){ console.error('Erro ao ler o pódio da semana das Ilhas:', e); }
 }
 /* ⚠️ FECHAR É O QUE MARCA, e a gravação é best-effort -- o molde do `marcarNovidadesLidas`: se ela
@@ -43664,6 +43671,10 @@ function render(){
      disputa com ninguém -- ficam antes do convite online pela razão de sempre: ele tem 15 segundos
      de prazo e precisa ficar por cima de tudo. */
   if(game.novidadesModal){ html += renderNovidadesModal(); }
+  /* ⚠️ O PÓDIO DA SEMANA DAS ILHAS, logo depois: os dois nascem só na home e as marcas deles são
+     independentes, então podem coexistir -- e nessa ordem o pódio fica POR CIMA, que é o certo:
+     ele é o que acabou de acontecer, e o anúncio de novidades espera. */
+  if(game.ilhasResumo){ html += renderIlhasResumoModal(); }
   if(game.onlinePendente){ html += renderConviteModal(); }   // aparece por cima de qualquer tela
   if(game.desafioAviso){ html += renderAvisoDesafioModal(); }   // desafio de amigo, idem
   html += renderAvisoDeSaveHtml();   // "não estou conseguindo salvar" -- por cima de tudo
