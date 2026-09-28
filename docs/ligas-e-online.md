@@ -3130,3 +3130,84 @@ composto, que também achou zero).
 
 **Os 16 defeitos religados acusam** (2 a 12 falhas cada).
 
+## A TELA DE ESCOLHER TERRENO VIROU UMA SÓ (28/09/2026)
+
+Pedida assim: *"faça um novo design para a tela de escolher os terrenos da trainers league e
+ginasio da cidade. Hoje ele tá feio, confuso, parece que foi feito de qualquer jeito"*.
+
+### ⚠️ ELE FOI MESMO — porque eram DUAS TELAS COPIADAS que derivaram
+
+Medido a 320px, antes de tocar em nada:
+
+| | Trainers League | Ginásio da Cidade |
+|---|---|---|
+| layout | **lista de 1 coluna** | **grade de 2 colunas** |
+| **altura da tela** | **4.280px** (7,5 telas) | **3.378px** |
+| altura de cada linha | 47px | 92px |
+| a fileira de filtros | 164px | 193px |
+| a classe do chip aceso | `.active` | `.on` |
+| contagem no filtro | não | sim |
+| ⚠️ **rola pro lado a 320px** | **SIM** | não |
+
+A mesma escolha tinha **duas caras**, e a maior delas eram **7,5 telas de rolagem** pra comparar
+51 itens. O "feito de qualquer jeito" tinha causa: eram dois arquivos de código pro mesmo botão.
+
+### O DESENHO NOVO SEGUE O QUE O TERRENO FAZ
+
+⚠️ **O único efeito do terreno é +15% nos seis atributos pros pokémon de um TIPO.** Ou seja o
+jogador está escolhendo um **tipo** — os 51 nomes são sabor. E são exatamente **17 tipos × 6
+terrenos**.
+
+Então a tela pergunta **o tipo primeiro** (uma grade de 17 botões na cor do tipo, o mesmo
+vocabulário do selo que ele já lê na Pokédex e na batalha) e mostra **os 6 daquele tipo**.
+Despejar os 51 era pedir que ele comparasse numa lista de 7 telas.
+
+| medido a 320px | antes | agora |
+|---|---|---|
+| Trainers League, ao abrir | 4.280px | **785px** |
+| com um tipo escolhido | — | 1.079px (6 cards de 56px) |
+| Ginásio, ao abrir | 3.378px | **1.035px** |
+| rola pro lado | SIM (a Liga) | **não, em nenhuma** |
+| nome ou tipo truncado | — | **nenhum** |
+
+- **"Ver todos" continua**, pra quem quer passear pelos nomes — é **opt-in**, não o padrão.
+- **⚠️ O GINÁSIO ABRE NO TIPO DO TERRENO ATUAL**, e a Liga abre na grade: lá existe escolha
+  anterior e aqui não. Cair nos seis do mesmo tipo é cair **ao lado do que ele tem hoje**, que é
+  onde a comparação acontece.
+- **O atual é marcado por SELO** (`ATUAL`), e não só por moldura: num celular a moldura sozinha se
+  confunde com o toque.
+- **⚠️ E O CONTADOR SAIU DOS BOTÕES DE TIPO, medido:** os 17 têm **exatamente 6** cada, então o
+  número era o mesmo em todos — não ajudava a escolher e custava uma segunda linha em 18 botões
+  (a grade caía de 140 pra **247px**). Ele ficou só no "Ver todos", onde informa (51).
+
+### ⚠️ E A COR DO TEXTO DOS BOTÕES PASSOU A SEGUIR A LUMINÂNCIA DO FUNDO
+
+Com branco fixo, **10 dos 18 botões ficavam abaixo de 3:1** — e o **Elétrico dava 1,49**,
+praticamente ilegível. O `text-shadow` engana o olho e **não entra na conta**.
+
+⚠️ **E não dá pra escolher uma cor só:** os 17 tipos vão de um amarelo quase branco (`#F8D030`) a
+um roxo escuro (`#705898`). Qualquer cor fixa reprova em metade deles — é por isso que a decisão é
+**por fundo**, e não por gosto.
+
+⚠️ **E A PRIMEIRA VERSÃO USOU UM LIMIAR DE 0,36, QUE ESTÁ ERRADO.** O cruzamento onde preto e
+branco empatam é **L = 0,179** — então toda cor entre 0,179 e 0,36 recebia branco quando o preto
+contrastava mais. Medido: sobravam **3 tipos abaixo de 3:1**. Hoje ela **compara as duas e pega a
+melhor**, que não tem limiar pra errar: **0 de 17 abaixo de 3, e o pior é 5,59**.
+
+⚠️ **E O `typePill` DO JOGO TEM O MESMO PROBLEMA** — ele é branco sobre a cor do tipo, em toda
+tela. Não foi tocado: ali o selo é pequeno e vem ao lado de um nome que já diz o tipo, e mexer nele
+mudaria a cara do jogo inteiro, o que não foi pedido. **Fica registrado como achado.**
+
+### O QUE ISSO DEIXOU NO CÓDIGO
+
+Uma função só (`telaDeEscolhaDeTerreno`), um estado só (`game.terrenoTipo`, estado de TELA — não
+vai pro save), e **saíram** as duas famílias de CSS, as duas funções de filtro e os dois campos
+(`terrainFilter` e `trainersLeagueTerrainFilterType`) — 47 linhas de CSS morto entre eles.
+
+⚠️ **A trava que importa é a que impede a cópia de renascer:** as duas telas têm que CHAMAR a
+função e **não podem montar marcação própria** (nada de `<div` ou `<button` nelas). É assim que a
+divergência volta — uma tag aqui, outra ali, e em duas mexidas são duas telas de novo.
+
+`tools/test-terrenos.js` tranca 21 pontas, e **6 de 6 defeitos religados acusam**. **No motor,
+nada** — é apresentação inteira.
+

@@ -965,5 +965,90 @@ console.log('\n=== A TIPAGEM DAS 250 E A DA GEN 3 ===');
   ok('  e a tipagem e IGUAL nos dois motores', difs.length === 0, difs.slice(0, 5).join(', '));
 }
 
+
+const HTML = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+console.log('\n=== A TELA DE ESCOLHER TERRENO E UMA SO (28/09/2026) ===');
+{
+  /* ⚠️ ESTA E A TRAVA QUE IMPORTA: a Trainers League e o Ginasio da Cidade tinham DUAS telas
+     copiadas que derivaram -- uma lista em coluna e uma grade de 2 colunas, uma marcando o chip
+     com `.active` e a outra com `.on`, uma com contagem e a outra sem. Medido a 320px: 4.280px e
+     3.378px de altura, e a da Liga rolava pro lado. Hoje as duas chamam a MESMA funcao, e e isso
+     que impede a proxima divergencia. */
+  for(const fn of ['renderTrainersLeagueTerrainPicker', 'renderNeighborhoodGymTerrainPicker']){
+    const i = HTML.indexOf('function ' + fn + '(');
+    const corpo = i < 0 ? '' : HTML.slice(i, HTML.indexOf('\n}', i));
+    ok('  o ' + fn + ' chama a tela unica', corpo.indexOf('telaDeEscolhaDeTerreno({') > 0);
+    /* ⚠️ E NAO PODE MONTAR HTML PROPRIO: e assim que a copia volta -- uma <div> aqui, um <button>
+       ali, e em duas mexidas sao duas telas de novo. */
+    ok('    e nao monta HTML proprio', !/<div|<button/.test(corpo),
+       /<div|<button/.test(corpo) ? 'tem marcacao propria' : '');
+  }
+  /* as familias de CSS antigas tem que ter SUMIDO -- deixa-las e deixar a copia meio viva */
+  for(const c of ['terrain-picker-row', 'gym-terrain-picker-row', 'terrain-filter-chip'])
+    ok('  a classe antiga .' + c + ' nao existe mais', HTML.indexOf('.' + c) < 0);
+  for(const f of ['filtrarTerreno', 'terrenosFiltrados', 'setTrainersLeagueTerrainFilter'])
+    ok('  a funcao antiga ' + f + ' nao existe mais', HTML.indexOf('function ' + f) < 0);
+
+  /* ⚠️ O DESENHO SEGUE A MECANICA: o terreno so faz +15% pra um TIPO, entao a tela pergunta o
+     TIPO e mostra os SEIS daquele tipo -- em vez dos 51. Sao 17 tipos x 6, conferido aqui. */
+  const porTipo = {};
+  S.TERRAINS.forEach(t => t.types.forEach(ty => { porTipo[ty] = (porTipo[ty] || 0) + 1; }));
+  const tipos = Object.keys(porTipo);
+  ok('sao 17 tipos com 6 terrenos cada (e o que o desenho pressupoe)',
+     tipos.length === 17 && tipos.every(ty => porTipo[ty] === 6),
+     tipos.length + ' tipos, contagens ' + [...new Set(tipos.map(ty => porTipo[ty]))].join('/'));
+
+  /* o comportamento: sem tipo escolhido nao lista nada; com um tipo lista os 6; '*' lista os 51 */
+  S.game.terrenoTipo = null;
+  ok('  sem tipo escolhido ele NAO lista terreno nenhum', S.terrenosDoTipo().length === 0);
+  S.game.terrenoTipo = 'Water';
+  ok('  com um tipo ele lista os 6 dele', S.terrenosDoTipo().length === 6,
+     String(S.terrenosDoTipo().length));
+  ok('    e todos sao daquele tipo', S.terrenosDoTipo().every(t => t.types.indexOf('Water') >= 0));
+  S.game.terrenoTipo = '*';
+  ok('  e "Ver todos" lista os ' + S.TERRAINS.length, S.terrenosDoTipo().length === S.TERRAINS.length);
+  S.game.terrenoTipo = 'Water';
+  S.escolherTipoDeTerreno('Water');
+  ok('  e tocar de novo no mesmo tipo VOLTA pra grade', S.game.terrenoTipo === null);
+
+  /* ⚠️ A COR DO TEXTO SEGUE A LUMINANCIA DO FUNDO, e isso foi medido: com branco fixo, 10 dos 18
+     botoes ficavam abaixo de 3:1 e o Eletrico dava 1,49 -- ilegivel. E a PRIMEIRA versao usava um
+     limiar de 0,36, que esta ERRADO: o cruzamento onde preto e branco empatam e 0,179, entao toda
+     cor entre os dois recebia branco quando o preto contrastava mais. Hoje ela compara as duas. */
+  {
+    const lum = (hex) => { const n = parseInt(hex.slice(1), 16);
+      const f = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+      return 0.2126 * f((n >> 16) & 255) + 0.7152 * f((n >> 8) & 255) + 0.0722 * f(n & 255); };
+    const contraste = (hex, txt) => { const a = lum(hex), b = txt === '#fff' ? 1 : lum('#1a1a1a');
+      return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05); };
+    const piores = tipos.map(ty => ({ ty, c: contraste(S.TYPE_COLORS[ty], S.corDeTextoSobre(S.TYPE_COLORS[ty])) }))
+      .sort((a, b) => a.c - b.c);
+    ok('nenhum botao de tipo fica abaixo de 3:1', piores[0].c >= 3,
+       'o pior e ' + piores[0].ty + ' com ' + piores[0].c.toFixed(2));
+    /* ⚠️ E ELA ESCOLHE A MELHOR DAS DUAS, sempre -- e isso e mais forte que o numero acima: ele
+       pode passar por sorte da paleta, isto nao. */
+    const errou = tipos.filter(ty => { const h = S.TYPE_COLORS[ty];
+      const escolhida = S.corDeTextoSobre(h), outra = escolhida === '#fff' ? '#1a1a1a' : '#fff';
+      return contraste(h, escolhida) < contraste(h, outra); });
+    ok('  e ela escolhe SEMPRE a melhor das duas cores', errou.length === 0, errou.join(', '));
+    ok('  (com branco fixo seriam varios abaixo de 3 -- e o que ela conserta)',
+       tipos.filter(ty => contraste(S.TYPE_COLORS[ty], '#fff') < 3).length >= 5,
+       tipos.filter(ty => contraste(S.TYPE_COLORS[ty], '#fff') < 3).length + ' reprovariam');
+  }
+
+  /* ⚠️ O SELO "ATUAL" e do GINASIO, e nao da Liga: la existe escolha anterior e aqui nao. */
+  {
+    /* ⚠️ O TIPO TEM QUE ESTAR ESCOLHIDO, senao nao ha card nenhum na tela e o selo nao teria
+       onde aparecer -- a trava mediria o conjunto vazio e passaria com o selo removido. */
+    S.game.terrenoTipo = S.TERRAINS[0].types[0];
+    const comAtual = S.telaDeEscolhaDeTerreno({ titulo:'t', subtitulo:'s', atualId: S.TERRAINS[0].id,
+      aoEscolher:'f', aoVoltar:'g()', voltar:'v' });
+    const semAtual = S.telaDeEscolhaDeTerreno({ titulo:'t', subtitulo:'s', atualId: null,
+      aoEscolher:'f', aoVoltar:'g()', voltar:'v' });
+    ok('o selo ATUAL sai quando ha terreno escolhido', comAtual.indexOf('terr-atual-selo') > 0);
+    ok('  e nao sai quando nao ha', semAtual.indexOf('terr-atual-selo') < 0);
+  }
+}
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
 process.exit(falhas ? 1 : 0);

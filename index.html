@@ -549,17 +549,6 @@
      era fácil ler os números do adversário achando que eram os seus */
   .online-trainer-card.meu{border-color:var(--blue);}
   /* filtro de tipo na escolha de terreno */
-  .terrain-filter{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px;}
-  .terrain-filter-chip{
-    display:flex;align-items:center;gap:4px;
-    background:var(--box);border:2px solid var(--box-border);border-radius:4px;
-    padding:4px 7px;cursor:pointer;font-family:var(--font-ui);
-    font-size:.68rem;font-weight:800;color:var(--ink);
-  }
-  .terrain-filter-chip.on{border-color:var(--blue);background:#e8f0ff;}
-  .terrain-filter-chip .type-pill{font-size:.5rem;padding:2px 5px;}
-  .terrain-filter-n{font-size:.6rem;color:var(--muted);}
-  .terrain-filter-chip.on .terrain-filter-n{color:var(--blue-dark);}
   .online-countdown{
     font-family:var(--font-pixel);font-size:2rem;color:var(--yellow-dark);
     text-align:center;margin-top:8px;animation:online-tick .5s ease-in-out infinite;
@@ -2290,42 +2279,52 @@
   }
   .terrain-inline-badge:active{transform:translate(1px,1px);box-shadow:1px 1px 0 rgba(0,0,0,.3);}
   .tl-visitor-terrain{display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:6px 0;}
-  .terrain-picker-list{display:flex;flex-direction:column;gap:5px;margin-bottom:10px;}
-  .terrain-picker-row{
-    display:flex;
-    align-items:center;
-    gap:10px;
-    text-align:left;
-    padding:7px 12px;
-  }
-  .terrain-picker-icon{font-size:1.3rem;flex-shrink:0;}
-  .terrain-picker-name{flex:1;font-weight:800;font-size:.85rem;}
-  .terrain-picker-types{display:flex;gap:4px;flex-shrink:0;}
-  /* variante compacta em grade 2 colunas, só pro seletor de terreno do Ginásio da Cidade -- classes
-     próprias, não reaproveita as de cima, pra não alterar o seletor da Trainers League junto */
-  .gym-terrain-picker-list{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;}
-  .gym-terrain-picker-row{
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    gap:4px;
-    text-align:center;
-    padding:8px 10px;
-  }
-  .gym-terrain-picker-name{font-weight:800;font-size:.8rem;line-height:1.2;}
-  .gym-terrain-picker-types{display:flex;flex-wrap:wrap;justify-content:center;gap:3px;flex-shrink:0;}
-  .terrain-filter-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
-  .terrain-filter-chip{
-    font-family:var(--font-ui);
-    font-size:.7rem;
-    font-weight:700;
-    background:#fff;
-    border:2px solid var(--box-border);
-    border-radius:20px;
-    padding:5px 12px;
-    cursor:pointer;
-  }
-  .terrain-filter-chip.active{background:var(--box-border);color:#fff;}
+  /* ============================================================================
+     A ESCOLHA DE TERRENO (28/09/2026) -- uma familia SO, usada pela Trainers League e pelo
+     Ginasio da Cidade. Antes eram DUAS, copiadas e derivadas: uma lista em coluna e uma grade de
+     2 colunas, uma marcando o chip com `.active` e a outra com `.on`, uma com contagem e a outra
+     sem. A mesma escolha tinha duas caras.
+     ⚠️ E O DESENHO SEGUE O QUE O TERRENO FAZ: o unico efeito dele e +15% pros pokemon de um TIPO,
+     entao o jogador esta escolhendo um TIPO -- os 51 nomes sao sabor. Por isso a tela pergunta o
+     tipo primeiro (17 botoes) e so entao mostra os 6 daquele tipo, em vez de despejar os 51.
+     MEDIDO a 320px: a tela vai de 4.280px (7,5 telas de rolagem) pra ~700px. */
+  .terr-topo{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:0 0 6px;}
+  .terr-topo h3{margin:0;font:800 .66rem/1.2 var(--font-ui);letter-spacing:.06em;
+    text-transform:uppercase;color:var(--muted);}
+  /* ⚠️ `minmax(0,1fr)` e nao `1fr`: `1fr` nao encolhe abaixo do conteudo, e "Lutador" empurraria
+     a grade pra fora dos 320px -- a armadilha que a fileira de cinco cards da home ja pagou. */
+  .terr-tipos{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:5px;margin:0 0 4px;}
+  .terr-tipo{border:2px solid rgba(0,0,0,.18);border-radius:9px;padding:6px 3px;cursor:pointer;
+    font:800 .6rem/1.15 var(--font-ui);color:#fff;text-align:center;
+    text-shadow:0 1px 2px rgba(0,0,0,.45);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  /* ⚠️ O ESCOLHIDO GANHA MOLDURA ESCURA, e nao uma cor propria: a cor do botao E o tipo, e trocar
+     ela faria o selecionado deixar de parecer o tipo que ele e. */
+  .terr-tipo.on{border-color:var(--ink);box-shadow:0 0 0 2px var(--box) inset;}
+  .terr-tipo .terr-n{display:block;font-size:.52rem;font-weight:700;opacity:.9;letter-spacing:0;}
+  .terr-todos{background:var(--box);border:2px dashed var(--box-border);color:var(--muted);
+    text-shadow:none;}
+  .terr-todos.on{border-style:solid;border-color:var(--ink);color:var(--ink);}
+  /* a lista dos terrenos daquele tipo */
+  .terr-lista{display:flex;flex-direction:column;gap:6px;margin:10px 0;}
+  .terr-card{display:grid;grid-template-columns:36px minmax(0,1fr);align-items:center;gap:10px;
+    width:100%;text-align:left;padding:8px 10px 8px 0;border-radius:10px;
+    background:var(--box);border:2px solid var(--box-border);cursor:pointer;
+    font-family:var(--font-ui);color:var(--ink);}
+  /* ⚠️ A FAIXA DE COR E O `border-left` GROSSO, como as duas telas antigas ja faziam -- e o que
+     liga o card ao terreno de relance, antes de ler o nome. */
+  .terr-card{border-left-width:7px;}
+  .terr-card:disabled{opacity:.55;cursor:default;}
+  .terr-card-ico{font-size:1.5rem;text-align:center;line-height:1;}
+  .terr-card-nome{display:block;font-weight:800;font-size:.82rem;line-height:1.2;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .terr-card-tipos{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;}
+  /* ⚠️ O ATUAL E MARCADO POR SELO, e nao so por moldura: num celular a moldura sozinha se confunde
+     com o toque. O texto diz o que ela significa. */
+  .terr-card.atual{border-color:var(--blue);background:#eaf2ff;}
+  .terr-atual-selo{font:800 .54rem/1 var(--font-ui);letter-spacing:.06em;text-transform:uppercase;
+    background:var(--blue);color:#fff;border-radius:4px;padding:3px 5px;margin-left:6px;
+    vertical-align:1px;}
+  .terr-vazio{font-size:.68rem;color:var(--muted);text-align:center;margin:14px 0;}
   .terrain-modal-header{
     display:flex;
     align-items:center;
@@ -9128,7 +9127,12 @@ async function submitNeighborhoodGymTeam(){
 // já configurado) ou logo depois de escolher o time numa reivindicação (nesse caso,
 // neighborhoodGymPendingClaimSlot está preenchido, e o envio junta os dois numa chamada só)
 function openNeighborhoodGymTerrainPicker(){
-  game.terrainFilter = null;   // sempre abre mostrando todos
+  /* ⚠️ ELE ABRE NO TIPO DO TERRENO ATUAL, e nao na grade vazia: quem vem trocar ja tem um
+     terreno, e cair nos SEIS do mesmo tipo e cair ao lado do que ele tem hoje -- que e onde a
+     comparacao acontece. Sem terreno ainda (assumindo o ginasio), abre na grade. */
+  const atual = game.neighborhoodGymDetail && game.neighborhoodGymDetail.leaderTerrain;
+  const doAtual = atual ? (TERRAINS.find(t => t.id === atual.id) || null) : null;
+  game.terrenoTipo = (doAtual && doAtual.types[0]) || null;
   game.neighborhoodGymPendingClaimSlot = null; // "Alterar terreno" direto da tela principal nunca é reivindicação
   game.screen = 'neighborhoodGymTerrainPicker';
   render();
@@ -19878,39 +19882,141 @@ function openTrainersLeagueTerrainPicker(dateId, roundIndex){
   game.trainersLeagueTerrainTarget = { dateId, roundIndex };
   game.trainersLeagueSwapReturnScreen = game.screen;
   game.trainersLeagueError = null;
-  game.trainersLeagueTerrainFilterType = null; // sem filtro ao abrir -- mostra todos
+  /* ⚠️ ABRE NA GRADE DE TIPOS, sem terreno listado: aqui NAO ha escolha anterior pra ancorar
+     (a do ginasio abre no tipo do terreno atual), e despejar os 51 e o que a tela veio consertar. */
+  game.terrenoTipo = null;
   game.screen = 'trainersLeagueTerrainPicker';
   render();
 }
-function setTrainersLeagueTerrainFilter(type){
-  game.trainersLeagueTerrainFilterType = (game.trainersLeagueTerrainFilterType===type) ? null : type; // clicar de novo no mesmo tipo remove o filtro
+/* ============================================================================
+   A ESCOLHA DE TERRENO, UMA SÓ (28/09/2026, a pedido: *"faça um novo design para a tela de
+   escolher os terrenos da trainers league e ginasio da cidade. Hoje ele tá feio, confuso, parece
+   que foi feito de qualquer jeito"*).
+
+   ⚠️ E ELE ESTAVA MESMO -- porque eram DUAS TELAS COPIADAS que derivaram. Medido a 320px:
+
+     |                        | Trainers League | Ginásio da Cidade |
+     | layout                 | lista 1 coluna  | grade 2 colunas   |
+     | altura da tela         | 4.280px         | 3.378px           |
+     | altura de cada linha   | 47px            | 92px              |
+     | a fileira de filtros   | 164px           | 193px             |
+     | rola pro lado a 320px  | SIM             | não               |
+
+   A mesma escolha tinha duas caras, e a maior delas eram 7,5 TELAS de rolagem.
+
+   ⚠️ O DESENHO NOVO SEGUE O QUE O TERRENO FAZ: o único efeito dele é +15% nos seis atributos pros
+   pokémon de um TIPO. Ou seja o jogador está escolhendo um TIPO -- os 51 nomes são sabor. São
+   exatamente 17 tipos × 6 terrenos, então a tela pergunta o TIPO primeiro e mostra os SEIS
+   daquele tipo. Despejar os 51 era pedir que ele comparasse numa lista de 7 telas.
+
+   ⚠️ E "Ver todos" CONTINUA, pra quem quer passear pelos nomes -- é opt-in, não o padrão.
+   ============================================================================ */
+/* ⚠️ A COR DO TEXTO SEGUE A LUMINANCIA DO FUNDO (28/09/2026). Medido nos 17 botoes de tipo com
+   texto branco: **10 de 18 ficavam abaixo de 3:1**, e o Eletrico dava **1,49** -- praticamente
+   ilegivel. O `text-shadow` engana o olho e nao entra na conta.
+   ⚠️ E NAO DA PRA ESCOLHER UMA COR SO: os 17 tipos vao de um amarelo quase branco (#F8D030) a um
+   roxo escuro (#705898). Qualquer cor fixa reprova em metade deles -- e e por isso que a decisao
+   e por FUNDO, e nao por gosto.
+   A conta e a luminancia relativa do WCAG, a mesma que as medicoes deste projeto usam.
+   ⚠️ E ELA FICA SO NOS BOTOES DE TERRENO, de proposito: o `typePill` do jogo tem o MESMO problema
+   (ele e branco sobre a cor do tipo, em toda tela), mas ali o selo e pequeno e vem ao lado de um
+   nome que ja diz o tipo -- e mexer nele mudaria a cara do jogo inteiro, que nao foi pedido.
+   Fica registrado como achado. */
+function corDeTextoSobre(hex){
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''));
+  if(!m) return '#fff';
+  const n = parseInt(m[1], 16);
+  const f = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+  const L = 0.2126 * f((n >> 16) & 255) + 0.7152 * f((n >> 8) & 255) + 0.0722 * f(n & 255);
+  /* ⚠️ ELA COMPARA AS DUAS, em vez de usar um limiar -- e a primeira versao usava 0,36, que estava
+     ERRADO: o cruzamento onde preto e branco empatam e L = 0,179, entao toda cor entre 0,179 e
+     0,36 recebia BRANCO quando o PRETO contrastava mais. Medido, isso deixava 3 tipos abaixo de
+     3:1 sem precisar. Comparar as duas nao tem limiar pra errar. */
+  const contra = (Lb) => (Math.max(L, Lb) + 0.05) / (Math.min(L, Lb) + 0.05);
+  return contra(0) >= contra(1) ? '#1a1a1a' : '#fff';   // 0 = preto, 1 = branco
+}
+function escolherTipoDeTerreno(tipo){
+  /* clicar de novo no mesmo tipo volta pra grade de tipos */
+  game.terrenoTipo = (game.terrenoTipo === tipo) ? null : tipo;
   render();
 }
+/* ⚠️ O ESTADO É UM SÓ pras duas telas (`game.terrenoTipo`), e não um por tela: o jogador só está
+   numa delas por vez, e dois campos divergiriam no primeiro ajuste -- foi exatamente o que as duas
+   cópias fizeram (`terrainFilter` e `trainersLeagueTerrainFilterType`, com classes `.on` e
+   `.active` pra marcar a mesma coisa). */
+function terrenosDoTipo(){
+  if(game.terrenoTipo === '*') return TERRAINS;
+  if(!game.terrenoTipo) return [];
+  return TERRAINS.filter(t => t.types.indexOf(game.terrenoTipo) >= 0);
+}
+/* ⚠️ A GRADE DE TIPOS SAI DO PRÓPRIO `TERRAINS`, nunca de uma lista escrita: terreno novo de um
+   tipo novo já aparece, e a contagem de cada um acompanha sozinha. */
+const TIPOS_DE_TERRENO = [...new Set(TERRAINS.flatMap(t => t.types))]
+  .sort((a, b) => (TYPE_NAMES_PT[a] || a).localeCompare(TYPE_NAMES_PT[b] || b));
+
+function telaDeEscolhaDeTerreno(op){
+  const lista = terrenosDoTipo();
+  const nTipo = (ty) => TERRAINS.filter(t => t.types.indexOf(ty) >= 0).length;
+  const grade = `
+  <div class="box">
+    <div class="terr-topo"><h3>Que tipo você quer favorecer?</h3></div>
+    ${/* ⚠️ A COR DO BOTÃO É A COR DO TIPO -- é o mesmo vocabulário do selo que o jogador já lê na
+         Pokédex e na batalha, então ele reconhece antes de ler a palavra. */''}
+    <div class="terr-tipos">
+      ${/* ⚠️ SEM CONTADOR NOS TIPOS, e isso foi medido: os 17 têm EXATAMENTE 6 cada, então o
+           número é o mesmo em todos -- ele não ajuda a escolher e custava uma segunda linha em 18
+           botões (a grade caía de 140px pra 247). Ele fica só no "Ver todos", onde informa. */''}
+      ${TIPOS_DE_TERRENO.map(ty => { const cor = TYPE_COLORS[ty] || '#888', txt = corDeTextoSobre(cor);
+        return `<button class="terr-tipo ${game.terrenoTipo === ty ? 'on' : ''}"
+        style="background:${cor};color:${txt};text-shadow:${txt === '#fff'
+          ? '0 1px 2px rgba(0,0,0,.45)' : 'none'};" onclick="escolherTipoDeTerreno('${ty}')"
+        title="${nTipo(ty)} terrenos">${escapeHtmlSafe(TYPE_NAMES_PT[ty] || ty)}</button>`; }).join('')}
+      ${/* ⚠️ AQUI o contador FICA -- ele e o unico que informa: os 17 tipos tem 6 cada (numero
+           repetido), e este diz 51. */''}
+      <button class="terr-tipo terr-todos ${game.terrenoTipo === '*' ? 'on' : ''}"
+        onclick="escolherTipoDeTerreno('*')">Ver todos <span class="terr-n">os ${TERRAINS.length}</span></button>
+    </div>
+  </div>`;
+
+  const cards = !lista.length
+    ? `<p class="terr-vazio">Toque num tipo pra ver os terrenos dele.</p>`
+    : `<div class="terr-lista">${lista.map(t => `
+      <button class="btn secondary terr-card ${op.atualId === t.id ? 'atual' : ''}"
+        ${op.desabilitado ? 'disabled' : ''} onclick="${op.aoEscolher}('${t.id}')"
+        style="border-left-color:${terrainColor(t)};">
+        <span class="terr-card-ico">${t.icon}</span>
+        <span>
+          <span class="terr-card-nome">${escapeHtmlSafe(t.name)}${
+            op.atualId === t.id ? '<span class="terr-atual-selo">atual</span>' : ''}</span>
+          <span class="terr-card-tipos">${t.types.map(ty => typePill(ty)).join('')}</span>
+        </span>
+      </button>`).join('')}</div>`;
+
+  return `
+  <div class="result-banner win">🗺️ ${op.titulo}</div>
+  <div class="box"><p${op.dica ? ' class="hint-text"' : ''}>${op.subtitulo}</p></div>
+  ${op.erro ? `<div class="box"><p class="error-text">${escapeHtmlSafe(op.erro)}</p></div>` : ''}
+  ${grade}
+  ${cards}
+  <button class="btn secondary" onclick="${op.aoVoltar}">⬅ ${op.voltar}</button>`;
+}
+
 function renderTrainersLeagueTerrainPicker(){
   const target = game.trainersLeagueTerrainTarget;
-  const filterType = game.trainersLeagueTerrainFilterType;
-  const allTypes = [...new Set(TERRAINS.flatMap(t=>t.types))].sort();
-  const filtered = filterType ? TERRAINS.filter(t=>t.types.includes(filterType)) : TERRAINS;
-  return `
-  <div class="box cursor">
-    <h2>Escolher terreno (você é o mandante)</h2>
-    <p>Vale só pra essa partida (rodada ${target?target.roundIndex+1:'?'}). Seu adversário <strong>vai ver</strong> qual terreno você escolheu assim que você confirmar. Se não escolher a tempo, um terreno é sorteado automaticamente.</p>
-  </div>
-  ${game.trainersLeagueError ? `<div class="box"><p class="error-text">${game.trainersLeagueError}</p></div>` : ''}
-  <div class="terrain-filter-row">
-    <button class="terrain-filter-chip ${!filterType?'active':''}" onclick="setTrainersLeagueTerrainFilter(null)">Todos</button>
-    ${allTypes.map(ty=>`<button class="terrain-filter-chip ${filterType===ty?'active':''}" style="${filterType===ty?`background:${TYPE_COLORS[ty]||'#888'};color:#fff;border-color:${TYPE_COLORS[ty]||'#888'};`:''}" onclick="setTrainersLeagueTerrainFilter('${ty}')">${TYPE_NAMES_PT[ty]||ty}</button>`).join('')}
-  </div>
-  <div class="terrain-picker-list">
-    ${filtered.length===0 ? `<p class="hint-text">Nenhum terreno desse tipo.</p>` : filtered.map(t=>`
-    <button class="btn secondary terrain-picker-row" ${game.trainersLeagueSubmitting?'disabled':''} onclick="pickTrainersLeagueTerrain('${t.id}')" style="border-left:6px solid ${terrainColor(t)};">
-      <span class="terrain-picker-icon">${t.icon}</span>
-      <span class="terrain-picker-name">${t.name}</span>
-      <span class="terrain-picker-types">${t.types.map(ty=>typePill(ty)).join('')}</span>
-    </button>
-  `).join('')}
-  </div>
-  <button class="btn secondary" onclick="leaveTrainersLeagueSwapPicker()">⬅ Voltar sem escolher</button>`;
+  /* ⚠️ AS DUAS COISAS QUE O JOGADOR PRECISA SABER ANTES DE ESCOLHER ficam na frase, e nada mais:
+     o adversário VAI VER a escolha, e não escolher não trava nada (sorteia). O resto do texto que
+     estava aqui ("vale só pra essa partida") virou o próprio título, que já diz a rodada. */
+  return telaDeEscolhaDeTerreno({
+    titulo: 'Terreno da rodada ' + (target ? target.roundIndex + 1 : '?'),
+    subtitulo: 'Você é o mandante. Seu adversário <strong>vai ver</strong> a escolha assim que você '
+             + 'confirmar — e se você não escolher a tempo, um terreno é sorteado.',
+    atualId: null,
+    desabilitado: !!game.trainersLeagueSubmitting,
+    erro: game.trainersLeagueError,
+    aoEscolher: 'pickTrainersLeagueTerrain',
+    aoVoltar: 'leaveTrainersLeagueSwapPicker()',
+    voltar: 'Voltar sem escolher'
+  });
 }
 async function pickTrainersLeagueTerrain(terrainId){
   const target = game.trainersLeagueTerrainTarget;
@@ -29182,44 +29288,27 @@ function renderNeighborhoodGymTeamPicker(){
 /* Filtro por tipo na escolha de terreno. São 39 terrenos numa lista só: quem quer favorecer um
    time de Fogo precisava rolar tudo procurando quais têm Fogo. O contador em cada chip mostra
    quantos existem daquele tipo (sempre 5, por desenho) antes mesmo de clicar. */
-const TIPOS_TERRENO = [...new Set(TERRAINS.flatMap(t=>t.types))]
-  .sort((a,b)=> (TYPE_NAMES_PT[a]||a).localeCompare(TYPE_NAMES_PT[b]||b));   // ordem alfabética em PT
-function filtrarTerreno(tipo){
-  game.terrainFilter = (game.terrainFilter === tipo) ? null : tipo;   // clicar de novo limpa
-  render();
-}
-function terrenosFiltrados(){
-  if(!game.terrainFilter) return TERRAINS;
-  return TERRAINS.filter(t=>t.types.includes(game.terrainFilter));
-}
 function renderNeighborhoodGymTerrainPicker(){
   const loc = game.neighborhoodGymLocation;
   const detail = game.neighborhoodGymDetail;
   const current = detail && detail.leaderTerrain ? detail.leaderTerrain.id : null;
   const isClaim = game.neighborhoodGymPendingClaimSlot != null;
-  return `
-  <div class="result-banner win">🗺️ ${isClaim ? 'Último passo: escolher terreno' : (current?'Alterar':'Escolher')+' terreno'} — Ginásio ${escapeHtmlSafe(loc?loc.city:'')}</div>
-  <div class="box">
-    ${isClaim
-      ? `<p>Falta só isso! Escolha o terreno pra confirmar de vez a liderança -- o time já está escolhido. Se você sair sem escolher, o ginásio continua vago.</p>`
-      : `<p class="hint-text">Esse terreno dá vantagem de mandante em toda batalha até você trocar de novo.</p>`}
-  </div>
-  <div class="terrain-filter">
-    <button class="terrain-filter-chip ${!game.terrainFilter?'on':''}" onclick="filtrarTerreno(null)">Todos <span class="terrain-filter-n">${TERRAINS.length}</span></button>
-    ${TIPOS_TERRENO.map(ty=>{
-      const n = TERRAINS.filter(t=>t.types.includes(ty)).length;
-      return `<button class="terrain-filter-chip ${game.terrainFilter===ty?'on':''}" onclick="filtrarTerreno('${ty}')">${typePill(ty)}<span class="terrain-filter-n">${n}</span></button>`;
-    }).join('')}
-  </div>
-  <div class="gym-terrain-picker-list">
-    ${terrenosFiltrados().map(t=>`
-      <button class="btn secondary gym-terrain-picker-row" ${game.neighborhoodGymChallenging?'disabled':''} onclick="submitNeighborhoodGymTerrain('${t.id}')" style="border-left:6px solid ${terrainColor(t)};${current===t.id?'outline:3px solid var(--blue-dark);':''}">
-        <span class="gym-terrain-picker-name">${t.icon} ${t.name}</span>
-        <span class="gym-terrain-picker-types">${t.types.map(ty=>typePill(ty)).join('')}</span>
-      </button>
-    `).join('')}
-  </div>
-  <button class="btn secondary" onclick="game.neighborhoodGymPendingClaimSlot=null;game.screen='neighborhoodGym';render();">⬅ Voltar sem salvar</button>`;
+  return telaDeEscolhaDeTerreno({
+    titulo: (isClaim ? 'Último passo: o terreno' : (current ? 'Trocar o terreno' : 'Escolher o terreno'))
+          + ' — Ginásio ' + escapeHtmlSafe(loc ? loc.city : ''),
+    subtitulo: isClaim
+      ? 'Falta só isso pra confirmar a liderança — o time já está escolhido. Se sair sem escolher, o ginásio continua vago.'
+      : 'Ele dá vantagem de mandante em <strong>toda</strong> batalha aqui, até você trocar de novo.',
+    dica: !isClaim,
+    /* ⚠️ O ATUAL É MARCADO com selo, e é por isso que esta tela precisa do campo: aqui existe uma
+       escolha anterior, e na Trainers League não. */
+    atualId: current,
+    desabilitado: !!game.neighborhoodGymChallenging,
+    erro: null,
+    aoEscolher: 'submitNeighborhoodGymTerrain',
+    aoVoltar: "game.neighborhoodGymPendingClaimSlot=null;game.screen='neighborhoodGym';render();",
+    voltar: 'Voltar sem salvar'
+  });
 }
 // deriva o status FINAL de cada pokémon único a partir do log de confrontos -- o servidor não manda
 // playerStatus/brockStatus prontos (só o log bruto), mas dá pra reconstruir: cada pokémon só aparece

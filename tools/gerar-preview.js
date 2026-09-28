@@ -263,6 +263,32 @@ game.ilhasResumo = { semanaId:'2026-09-21', pronto:true,
 add('Ilhas', 'Pódio da semana (o popup do fim de semana)', ()=>sb.renderIlhasResumoModal());
 game.ilhasResumo = null;
 
+/* ⚠️ AS DUAS TELAS DE ESCOLHER TERRENO, lado a lado -- e e assim que da pra ver que elas sao a
+   MESMA escolha com duas caras: uma e lista em coluna e a outra e grade de 2 colunas, uma diz
+   "Todos" com contagem e a outra sem, uma marca o chip com 'active' e a outra com 'on'. */
+game.trainersLeagueTerrainTarget = { roundIndex: 1, dateId: '2026-09-28' };
+game.terrenoTipo = null;
+game.trainersLeagueError = null;
+game.trainersLeagueSubmitting = false;
+add('Terrenos', 'Trainers League — a grade de tipos', ()=>sb.renderTrainersLeagueTerrainPicker());
+game.terrenoTipo = 'Water';
+add('Terrenos', 'Trainers League — os 6 de Água', ()=>sb.renderTrainersLeagueTerrainPicker());
+game.terrenoTipo = '*';
+add('Terrenos', 'Trainers League — "Ver todos" (os 51)', ()=>sb.renderTrainersLeagueTerrainPicker());
+game.terrenoTipo = null;
+
+game.neighborhoodGymLocation = { city: 'São Paulo' };
+game.neighborhoodGymDetail = { leaderTerrain: { id: 'recifes_coral' } };
+game.neighborhoodGymPendingClaimSlot = null;
+/* ⚠️ O GINÁSIO ABRE NO TIPO DO TERRENO ATUAL -- é o caso que mais importa medir, porque é o único
+   com o selo "atual" na tela. A praia é Água/Elétrico. */
+game.terrenoTipo = 'Water';
+add('Terrenos', 'Ginásio da Cidade — trocar (abre no tipo do atual)', ()=>sb.renderNeighborhoodGymTerrainPicker());
+game.neighborhoodGymPendingClaimSlot = 0;
+game.neighborhoodGymDetail = { leaderTerrain: null };
+add('Terrenos', 'Ginásio da Cidade — último passo (assumindo)', ()=>sb.renderNeighborhoodGymTerrainPicker());
+game.neighborhoodGymPendingClaimSlot = null;
+
 game.screen = 'league';
 game.currentLeagueTypeId = 'classic';
 game.leagueScreenLoading = false;
