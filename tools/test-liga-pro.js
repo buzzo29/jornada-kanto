@@ -606,7 +606,7 @@ console.log('\n=== PONTA A PONTA (o drawCycle de verdade) ===');
     'firebase-functions/v2/https': { onCall: (fn) => fn,
       HttpsError: class HttpsError extends Error { constructor(c, m){ super(m); this.code = c; } } },
     'firebase-functions/logger': { error(){}, info(){}, warn(){}, log(){} },
-    'firebase-admin': { initializeApp(){}, firestore: Object.assign(() => db, { FieldValue: fake.FieldValue }) }
+    'firebase-admin': { initializeApp(){}, firestore: Object.assign(() => db, { FieldValue: fake.FieldValue, FieldPath: fake.FieldPath }) }
   };
   const load = Module._load;
   Module._load = function(req){ if(stubs[req]) return stubs[req]; return load.apply(this, arguments); };
@@ -638,7 +638,7 @@ console.log('\n=== O PAINEL INSCREVE NA TRAINERS LEAGUE (27/09/2026) ===');
     'firebase-functions/v2/https': { onCall: (fn) => fn,
       HttpsError: class HttpsError extends Error { constructor(c, m){ super(m); this.code = c; } } },
     'firebase-functions/logger': { error(){}, info(){}, warn(){}, log(){} },
-    'firebase-admin': { initializeApp(){}, firestore: Object.assign(() => db2, { FieldValue: fake2.FieldValue }) }
+    'firebase-admin': { initializeApp(){}, firestore: Object.assign(() => db2, { FieldValue: fake2.FieldValue, FieldPath: fake2.FieldPath }) }
   };
   const load2 = Module2._load;
   Module2._load = function(req){ if(stubs2[req]) return stubs2[req]; return load2.apply(this, arguments); };
@@ -877,6 +877,68 @@ console.log('\n=== O PAINEL INSCREVE NA TRAINERS LEAGUE (27/09/2026) ===');
       const at9 = await db2.collection('leagueCycles').doc('classic__rec1')
         .collection('registrants').doc('rec-ativo').get().catch(() => null);
       ok('o treinador ATIVO nunca e inscrito', !(at9 && at9.exists));
+
+      /* ============================================================================
+         ⚠️ A TRAVA QUE FALTAVA: ELE ALCANCA A COLECAO INTEIRA, e nao so a primeira pagina.
+         A primeira versao do sorteio dava `startAfter(Math.random() * limite)` com
+         `orderBy('lastSeenAt')` -- e MEDIDO na producao os `lastSeenAt` ocupam uma faixa de 28
+         dias, que e 0,136% do intervalo sorteado. Em 99,86% das voltas o sorteio caia ABAIXO de
+         tudo e a consulta devolvia SEMPRE os mesmos 10 primeiros: com 224 contas e 110 inativas,
+         ele inscreveu 2 e parou.
+         ⚠️ E AS TRAVAS QUE JA EXISTIAM PASSARAM VERDES, porque o painel delas tem TRES contas --
+         ali a primeira pagina E a colecao inteira. O que separa um sorteio de verdade de um que
+         so ve o comeco e a colecao ser MAIOR que a pagina.
+         ============================================================================ */
+      {
+        /* ⚠️ OS IDS TEM QUE PARECER COM OS DA PRODUCAO, e a primeira versao deste painel usava
+           `dist-00`..`dist-29` -- todos com o MESMO PREFIXO. Com eles o sorteio por id media o
+           painel e nao a regra: um id sorteado cai antes de 'd' em 63% das vezes e depois de 'r'
+           em quase todo o resto, entao a trava dava 9 de 30 com o codigo CERTO.
+           UID do Firebase Auth sao 28 caracteres de [A-Za-z0-9] uniformes (exemplo real de
+           producao: soGCSpgN0qhpUJPiu4agCq9gVgX2) -- e e sobre essa uniformidade que o sorteio se
+           apoia. Painel com id sintetico mede o prefixo, nao o sorteio.
+           ⚠️ O GERADOR AQUI E SEMEADO pra a trava nao virar flake: mesma lista todo dia. */
+        const ALFA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        let semente = 20260927;
+        const dado = () => (semente = (semente * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+        const uidFalso = () => { let s = '';
+          for(let k = 0; k < 28; k++) s += ALFA[Math.floor(dado() * ALFA.length)]; return s; };
+        /* 30 inativos, com o lastSeenAt numa faixa ESTREITA como a da producao (28 dias) */
+        const base = ag - 40 * DIA2, faixa = 28 * DIA2;
+        const daDist = new Set();
+        for(let i = 0; i < 30; i++){
+          const u = uidFalso(); daDist.add(u);
+          await conta9(u, 'Dist' + i, base + Math.floor((i / 30) * faixa),
+            { '0': { team: time9(50 + i), badgeCount: 8 } });
+        }
+
+        await db2.collection('leagues').doc('schedule_classic').set({
+          cycles: [{ id: 'rec2', status: 'registering', scheduledTime: ag + 6e5 }] });
+
+        const pegos = new Set();
+        for(let v = 0; v < 60; v++){
+          const r = await R.recrutarParaAClassica();
+          if(r.ok && daDist.has(r.uid)) pegos.add(r.uid);
+        }
+        /* ⚠️ COM 60 VOLTAS E 30 ELEGIVEIS ele tem que alcancar QUASE TODOS. Com o sorteio velho
+           ele pararia nos RECRUTA_CANDIDATOS primeiros (10) -- e e essa a diferenca que a trava
+           mede. O limiar e 20 e nao 30 porque o sorteio e sorteio: uma cauda de azar e legitima. */
+        ok('  ele alcanca a colecao INTEIRA, nao so a primeira pagina',
+           pegos.size >= 20, pegos.size + ' de 30 alcancados em 60 voltas'
+           + '  (com o sorteio velho o teto era ' + F2._recrutador.RECRUTA_CANDIDATOS + ')');
+        ok('    e passou de longe da primeira pagina',
+           pegos.size > F2._recrutador.RECRUTA_CANDIDATOS, String(pegos.size));
+      }
+
+      /* ⚠️ E O SORTEIO E PELO ID, que e o unico campo com distribuicao uniforme aqui: o UID do
+         Firebase Auth sao 28 caracteres aleatorios. Sortear sobre um TIMESTAMP -- cuja
+         distribuicao ninguem mediu -- foi o defeito. Ha trava lendo o codigo porque o sintoma de
+         voltar pro timestamp e MUDO num painel pequeno. */
+      ok('  e a janela e sorteada pelo ID, nao por timestamp',
+         /orderBy\(PORID\)/.test(srvSrc) && /FieldPath\.documentId\(\)/.test(srvSrc)
+         && !/startAfter\(Math\.floor\(Math\.random\(\) \* limite\)\)/.test(srvSrc));
+      ok('    e o filtro de inatividade acontece em MEMORIA (o Firestore nao deixa os dois)',
+         /typeof v === 'number' && v < limite/.test(srvSrc));
 
       const SRV = srvSrc;
       /* ⚠️ E AS DUAS AGENDAS SAO OS DOIS RITMOS DO PEDIDO, no FUSO DO JOGO: o `onSchedule` usa UTC

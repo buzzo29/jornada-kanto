@@ -6740,25 +6740,62 @@ const RECRUTA_INATIVO_MS = 7 * 24 * 60 * 60 * 1000;   // "não loga há mais de 
 const RECRUTA_CANDIDATOS = 10;
 const RECRUTA_TENTATIVAS = 3;
 
-/* ⚠️ A JANELA ALEATÓRIA É O QUE FAZ O "ALEATÓRIO" SEM LER A COLEÇÃO INTEIRA: o Firestore não
-   sorteia, então a consulta começa num `lastSeenAt` sorteado dentro da faixa dos inativos e pega
-   a página dali. Ler todos e sortear um funciona hoje (dezenas de contas) e deixa de funcionar
-   sozinho quando elas forem milhares -- e o sintoma seria a conta de leitura, não um erro.
-   ⚠️ E QUEM NUNCA TEVE `lastSeenAt` FICA DE FORA, de propósito: o Firestore pula documento sem o
-   campo num `where`, e conta que nunca abriu o jogo também nunca teve time campeão. */
+/* ============================================================================
+   ⚠️ A JANELA SORTEADA É PELO **ID**, e não pelo `lastSeenAt` -- e essa foi a correção de
+   27/09/2026, poucos minutos depois de a função subir. Relatado como *"já subiu faz uns minutos e
+   ainda só tem 4 inscritos"*.
+
+   A primeira versão sorteava o ponto de partida em `[0, limite]` e dava `startAfter` nele, com
+   `orderBy('lastSeenAt')`. **MEDIDO na produção, e o número é brutal:** são 224 contas, 110
+   inativas, e os `lastSeenAt` delas vivem numa faixa de **28 dias** -- que é **0,136%** do
+   intervalo sorteado. Ou seja: em **99,86%** das voltas o sorteio caía ABAIXO de tudo e a consulta
+   devolvia SEMPRE os mesmos 10 primeiros. Com 3 tentativas por volta, ele esgotava esses dez e
+   parava de achar -- com 110 inativos disponíveis.
+
+   ⚠️ A LIÇÃO É A DO PAINEL, de novo: eu sorteei uniforme num intervalo onde o dado real ocupa um
+   milésimo. "Aleatório" sobre um campo cuja distribuição você não mediu não é aleatório.
+
+   ⚠️ E A CORREÇÃO É SORTEAR SOBRE UM CAMPO QUE **É** UNIFORME: o id do documento. O UID do
+   Firebase Auth são 28 caracteres de [A-Za-z0-9] essencialmente aleatórios, então um id sorteado
+   corta a coleção num ponto uniforme de verdade.
+   ⚠️ O PREÇO É QUE O FILTRO SAI DA CONSULTA: o Firestore exige que o primeiro `orderBy` seja o
+   campo da desigualdade, então não dá pra ordenar por id E filtrar `lastSeenAt <`. O filtro passou
+   a ser feito EM MEMÓRIA, sobre a página -- o que custa ler alguns ativos à toa (medido: 110 de
+   230 são inativos, então ~48% da página se aproveita) e em troca dá sorteio de verdade.
+   ⚠️ E QUEM NUNCA TEVE `lastSeenAt` CONTINUA DE FORA, agora explicitamente: sem o campo ele não é
+   inativo nem ativo, e conta que nunca abriu o jogo também nunca teve time campeão.
+   ============================================================================ */
+const RECRUTA_ALFABETO = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+function idSorteado(){
+  let s = '';
+  for(let i = 0; i < 28; i++) s += RECRUTA_ALFABETO[Math.floor(Math.random() * RECRUTA_ALFABETO.length)];
+  return s;
+}
 async function sortearInativoComTimeCampeao(ciclo){
   const limite = Date.now() - RECRUTA_INATIVO_MS;
-  const inicio = Math.floor(Math.random() * limite);
-  let cands = await db.collection('users')
-    .where('lastSeenAt', '<', limite).orderBy('lastSeenAt')
-    .startAfter(inicio).limit(RECRUTA_CANDIDATOS).get();
-  /* a janela pode cair no fim da faixa e voltar vazia -- aí lê do começo */
-  if(cands.empty) cands = await db.collection('users')
-    .where('lastSeenAt', '<', limite).orderBy('lastSeenAt').limit(RECRUTA_CANDIDATOS).get();
-  if(cands.empty) return null;
+  const col = db.collection('users');
+  /* ⚠️ O `FieldPath.documentId()`, e nao a string '__name__': e a forma que o painel de
+     treinadores ja usa em producao pra paginar por id, e o fake-firestore so conhece essa.
+     O cursor e o id CRU -- e assim que o `adminListTrainers` pagina, e funciona. */
+  const PORID = admin.firestore.FieldPath.documentId();
+  let cands = await col.orderBy(PORID).startAfter(idSorteado()).limit(RECRUTA_CANDIDATOS).get();
+  /* a janela pode cair no fim da coleção e voltar curta -- aí completa do começo */
+  if(cands.size < RECRUTA_CANDIDATOS){
+    const doComeco = await col.orderBy(PORID).limit(RECRUTA_CANDIDATOS).get();
+    const vistosIds = new Set(cands.docs.map(d => d.id));
+    cands = { docs: cands.docs.concat(doComeco.docs.filter(d => !vistosIds.has(d.id))), empty: false };
+  }
+  if(!cands.docs.length) return null;
 
-  /* embaralha a página: sem isto ele tentaria sempre os mesmos da janela sorteada */
-  const uids = cands.docs.map(d => d.id);
+  /* ⚠️ O FILTRO DE INATIVIDADE ACONTECE AQUI, sobre a página que já foi lida -- ver o porquê no
+     comentário acima. E ele é a MESMA regra de antes: "não loga há mais de uma semana". */
+  const uids = cands.docs.filter(d => {
+    const v = (d.data() || {}).lastSeenAt;
+    return typeof v === 'number' && v < limite;
+  }).map(d => d.id);
+  if(!uids.length) return null;
+
+  /* embaralha: sem isto ele tentaria sempre os primeiros da janela */
   for(let i = uids.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1));
     [uids[i], uids[j]] = [uids[j], uids[i]]; }
 
@@ -6799,9 +6836,18 @@ async function melhorSaveCampeaoDaConta(uid){
    que impede uma coleção grande de virar uma enxurrada de inscrições numa volta só. */
 async function recrutarParaAClassica(){
   const ciclo = await adminCicloAberto();
-  if(!ciclo) return { ok: false, motivo: 'sem ciclo com inscrições abertas' };
+  if(!ciclo){
+    logger.info('Recrutador: sem ciclo com inscrições abertas');
+    return { ok: false, motivo: 'sem ciclo com inscrições abertas' };
+  }
   const achado = await sortearInativoComTimeCampeao(ciclo);
-  if(!achado) return { ok: false, motivo: 'nenhum inativo elegível nesta volta' };
+  /* ⚠️ O MOTIVO VAI PRO LOG. Sem isto a volta que não acha ninguém é uma LINHA VAZIA no console,
+     e foi exatamente o que atrasou o diagnóstico do sorteio: as três voltas que falharam não
+     disseram nada, e não dava pra separar "não há ciclo" de "não há candidato". */
+  if(!achado){
+    logger.info('Recrutador: nenhum inativo elegível nesta volta (ciclo ' + ciclo.id + ')');
+    return { ok: false, motivo: 'nenhum inativo elegível nesta volta' };
+  }
   try{
     const montado = await montarInscritoDoSave(achado.uid, achado.slot);
     await gravarInscritoNaClassica(achado.uid, achado.slot, ciclo, montado);

@@ -263,9 +263,23 @@ function collRef(parts, filtros, limite, ordem, depoisDe, soIds){
         });
         /* O CURSOR CORTA DEPOIS DA ORDENACAO e ANTES do limite -- essa ordem e a coisa toda: cortando
            depois do limite, a segunda pagina viria vazia sempre que a primeira estivesse cheia. */
+        /* ⚠️ O `startAfter` DO FIRESTORE E POSICIONAL, nao exact-match -- e essa era a terceira
+           forma de falso verde deste duble (as outras duas, achadas no mesmo dia: o operador '<'
+           que faltava e o desconhecido que passava).
+           Ele fazia `findIndex(valor === cursor)` e, nao achando, IGNORAVA o cursor: a consulta
+           devolvia a PRIMEIRA pagina como se nada tivesse sido pedido. Descoberto em 27/09/2026
+           escrevendo o recrutador da Liga Classica, que sorteia um id que de proposito NAO existe
+           (ele quer um ponto de CORTE, nao um documento) -- a trava media 10 de 30 com o codigo
+           certo, e 10 era exatamente o tamanho da pagina.
+           ⚠️ E O CERTO E CORTAR NO PRIMEIRO QUE PASSA DO CURSOR, na direcao da ordenacao: e o que
+           permite paginar por um valor que nao e de nenhum documento. Cursor que EXISTE continua
+           se comportando igual (o documento dele fica de fora), entao a paginacao do painel de
+           treinadores nao muda. */
         if(depoisDe !== undefined && depoisDe !== null){
-          const i = docs.findIndex(d => valor(d) === depoisDe);
-          if(i >= 0) docs = docs.slice(i + 1);
+          const dir = criterios[0][1];
+          const passou = (v) => dir < 0 ? (v < depoisDe) : (v > depoisDe);
+          const i = docs.findIndex(d => passou(valor(d)));
+          docs = i >= 0 ? docs.slice(i) : [];
         }
       }
       if(limite) docs = docs.slice(0, limite);

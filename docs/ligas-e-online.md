@@ -2402,16 +2402,74 @@ recusa) nem quem está no ciclo aberto de OUTRA liga.
 
 ⚠️ **Há trava lendo o código pra isso:** o corpo do recrutador não pode ter um `.set(` próprio.
 
-### O SORTEIO, e por que ele é uma JANELA
+### ⚠️ O SORTEIO É PELO **ID**, e a primeira versão nasceu quebrada
 
-O Firestore não sorteia. A consulta começa num `lastSeenAt` **sorteado dentro da faixa dos
-inativos** e pega a página dali (`startAfter` + `limit`), depois embaralha a página.
+Ela sorteava o ponto de partida em `[0, limite]` e dava `startAfter` nele, com
+`orderBy('lastSeenAt')`. **Foi relatado em minutos**: *"já subiu faz uns minutos e ainda só tem 4
+inscritos"*.
 
-- **Ler todos e sortear um funcionaria hoje** (dezenas de contas) **e deixaria de funcionar
-  sozinho** quando elas forem milhares — e o sintoma seria a conta de leitura, não um erro.
-- ⚠️ **Quem nunca teve `lastSeenAt` fica de fora, de propósito:** o Firestore **pula documento sem
-  o campo** num `where`, e conta que nunca abriu o jogo também nunca teve time campeão.
-- **A janela pode cair no fim da faixa e voltar vazia** — aí ele lê do começo.
+**MEDIDO na produção, e o número mata a dúvida:**
+
+| | |
+|---|---|
+| contas | **224** |
+| **inativas (>7 dias)** | **110** |
+| faixa real de `lastSeenAt` | 30/08 a 27/09 — **28 dias** |
+| o que o código sorteava | `[0, limite]` — a faixa real é **0,136%** disso |
+
+⚠️ **Em 99,86% das voltas o sorteio caía ABAIXO de tudo**, e a consulta devolvia **sempre os mesmos
+10 primeiros**. Com 3 tentativas por volta ele esgotava esses dez e parava — **com 110 inativos
+disponíveis**.
+
+⚠️ **A LIÇÃO É A DO PAINEL, de novo: "aleatório" sobre um campo cuja distribuição você não mediu
+não é aleatório.** Um timestamp de 2026 vive num milésimo do intervalo `[0, agora]`.
+
+**A correção é sortear sobre o campo que É uniforme: o ID.** O UID do Firebase Auth são 28
+caracteres de `[A-Za-z0-9]` essencialmente aleatórios (um real: `soGCSpgN0qhpUJPiu4agCq9gVgX2`),
+então um id sorteado corta a coleção num ponto uniforme de verdade. Ele usa o
+`FieldPath.documentId()`, que é como o painel de treinadores já pagina em produção.
+
+⚠️ **O PREÇO É QUE O FILTRO SAI DA CONSULTA:** o Firestore exige que o primeiro `orderBy` seja o
+campo da desigualdade, então não dá pra ordenar por id **e** filtrar `lastSeenAt <`. O filtro
+passou a ser feito **em memória**, sobre a página — custa ler alguns ativos à toa (medido: 110 de
+230, ou seja ~48% da página se aproveita) e em troca dá sorteio de verdade.
+
+⚠️ **E o motivo passou a ir pro LOG.** A volta que não acha ninguém era uma **linha vazia** no
+console, e foi isso que atrasou o diagnóstico: as três voltas que falharam não disseram nada, e não
+dava pra separar *"não há ciclo"* de *"não há candidato"*.
+
+### ⚠️ E AS TRAVAS QUE JÁ EXISTIAM PASSARAM VERDES COM O DEFEITO
+
+O painel delas tinha **três contas** — ali a primeira página **é** a coleção inteira. O que separa
+um sorteio de verdade de um que só vê o começo é a coleção ser **maior que a página**.
+
+A trava nova semeia **30 inativos**, roda **60 voltas** e exige que ele alcance **mais de
+`RECRUTA_CANDIDATOS`** — hoje ela dá **30 de 30**.
+
+⚠️ **E ELA PRECISOU DE DUAS CORREÇÕES NO PRÓPRIO PAINEL antes de medir a regra:**
+
+1. **Os ids eram `dist-00`..`dist-29`** — todos com o mesmo prefixo. Com eles o sorteio por id
+   mede o PREFIXO e não a regra: um id sorteado cai antes de `d` em 63% das vezes. A trava dava
+   **9 de 30 com o código certo**. Hoje o painel usa UID de 28 caracteres, semeados pra não virar
+   flake.
+2. **⚠️ E O `startAfter` DO `fake-firestore` ERA EXACT-MATCH** — ver abaixo.
+
+### ⚠️ ELE ACHOU TRÊS FALSOS-VERDES NO `fake-firestore`, no mesmo dia
+
+| | o que o dublê fazia | o que isso escondia |
+|---|---|---|
+| o operador **`<`** | não existia, e o fallback era `return true` | **o filtro não acontecia** — a prova de mesa inscreveu um treinador ATIVO e passou verde |
+| operador desconhecido | passava tudo | o próximo a faltar repetiria isso em silêncio |
+| **`startAfter`** | `findIndex(valor === cursor)`; não achando, **ignorava o cursor** | a consulta devolvia a **primeira página** como se nada tivesse sido pedido — e o recrutador sorteia um id que **de propósito não existe** |
+
+⚠️ **Os três são a mesma família e a pior que um dublê tem:** a consulta *parece* funcionar, o teste
+fica verde, e em produção ela se comporta de outro jeito — ou seja **o teste cobre o oposto do que
+acontece**.
+
+Hoje o `<`, o `!=`, o `not-in` e o `array-contains` existem, **o operador desconhecido ESTOURA**
+com o nome dele, e o `startAfter` é **posicional** (corta no primeiro que passa do cursor, na
+direção da ordenação). Cursor que EXISTE continua se comportando igual, então a paginação do painel
+de treinadores não mudou — **conferido: a bateria inteira segue 44/44**.
 
 ### "O TIME DE MELHOR MÉDIA DE LEVEL"
 
@@ -2459,19 +2517,6 @@ compra é **não ler os saves** de quem já está inscrito, e isso se mede em LE
 Hoje ela conta os `get()` da subcoleção de saves **do treinador já inscrito** e exige **zero**.
 ⚠️ **E a primeira versão dessa contagem falhou com o código certo**, porque contava os saves de
 TODOS: ler os de quem NÃO está no ciclo é o trabalho legítimo da função.
-
-### ⚠️ E ELE ACHOU UM FALSO-VERDE DE FÁBRICA NO `fake-firestore`
-
-O filtro é um `where('lastSeenAt', '<', limite)` — e **o dublê não conhecia o operador `<`**. O
-fallback dele era **`return true`**, ou seja o filtro simplesmente **não acontecia**: a prova de
-mesa inscreveu um treinador **ATIVO** e passou verde.
-
-⚠️ **É a forma mais silenciosa de falso verde que um dublê pode ter:** a consulta parece filtrar, o
-teste fica verde, e em produção ela filtra de verdade — o teste cobre o **OPOSTO** do que acontece.
-
-Entraram o `<`, o `!=`, o `not-in` e o `array-contains`, e **o operador desconhecido passou a
-ESTOURAR** com o nome dele na mensagem. **Conferido: a bateria inteira continua 44/44** — nenhum
-outro teste dependia do silêncio.
 
 ### O QUE FICA REGISTRADO COMO CONSEQUÊNCIA ACEITA
 
