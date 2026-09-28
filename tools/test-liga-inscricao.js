@@ -433,6 +433,91 @@ console.log('\nO POLL DA CLASSICA E ADAPTATIVO (27/09/2026)');
   }
 }
 
+console.log('\nA TRAINERS LEAGUE ABRE EM 2 NIVEIS, E NAO EM 5');
+{
+  /* ⚠️ O QUE CUSTA E O NIVEL DE ESPERA, nao o numero de leituras. O banco esta em nam5
+     (multi-regiao nos EUA) e cada ida do Brasil e ~200ms -- entao duas leituras EM SERIE custam o
+     dobro de duas em PARALELO, sendo duas leituras nos dois casos. Esta trava mede a CADEIA.
+     Relatado em 28/09/2026: *'a tela da trainers league, sempre quando eu abro demora pra
+     carregar as informacoes de quantos treinadores ja estao inscritos'*. Medido antes: CINCO
+     niveis -- ciclo, contagem, liga-de-ontem, minha-inscricao e minhas-escolhas, um esperando o
+     outro. E nenhum deles usava a resposta do anterior: todos so precisavam do `dateId`.
+     COMO: cada leitura dublada demora 20ms e anota QUANDO comecou. Leituras que comecam na mesma
+     janela sao a mesma ONDA; ondas distintas sao niveis em serie. */
+  const S9 = createSandbox();
+  const ATRASO = 20;
+  /* ⚠️ VER O COMENTARIO ACIMA: `Date.now` esta congelado neste ponto do arquivo. */
+  const agora9 = () => Number(process.hrtime.bigint() / 1000000n);
+  let t9 = 0; const inicios = [];
+  const snap9 = (d) => ({ exists: !!d, data: () => d || {}, id: 'x' });
+  const ref9 = (nome, d) => ({
+    get(){ inicios.push({ nome, em: agora9() - t9 });
+      return new Promise(r => setTimeout(() => r(snap9(d)), ATRASO)); },
+    set(){ return Promise.resolve(); },
+    collection(){ return ref9(nome, d); }, doc(){ return ref9(nome, d); }
+  });
+  const atrasado9 = (nome, v) => { inicios.push({ nome, em: agora9() - t9 });
+    return new Promise(r => setTimeout(() => r(v), ATRASO)); };
+  S9.trainersLeagueCycleRef = (id) => ref9('ciclo', { dateId: id, status: 'registering', updatedAt: 1, players: [] });
+  S9.trainersLeagueRegistrantRef = () => ref9('minhaInscricao', { name: 'Eu', uid: 'u1' });
+  S9.trainersLeagueTeamPickRef = () => ref9('meuTime', { overrides: {} });
+  S9.trainersLeagueTerrainPickRef = () => ref9('meuTerreno', { picks: {} });
+  S9.trainersLeagueCountRegistrants = () => atrasado9('contagem', 7);
+  S9.trainersLeaguePrevDayDone = () => atrasado9('ligaDeOntem', true);
+  S9.trainersLeagueRegistrantsRef = () => ref9('inscritos', null);
+  S9.render = () => {};
+  const g9 = S9.__getGame();
+  g9.authUser = { uid: 'u1' };  g9.screen = 'trainersLeague';
+  g9.trainersLeagueData = null; g9.trainersLeagueSiblingCache = null;
+  g9.trainersLeagueLastCycleStamp = null; g9.trainersLeagueCarregado = false;
+  S9.__setGame(g9);
+
+  t9 = agora9();
+  await S9.refreshTrainersLeagueView(false);
+  const ondas = [];
+  for(const x of inicios.sort((a, b) => a.em - b.em)){
+    const u = ondas[ondas.length - 1];
+    if(u && x.em - u.em < 10) u.nomes.push(x.nome); else ondas.push({ em: x.em, nomes: [x.nome] });
+  }
+  const resumo = ondas.map((o, n) => (n + 1) + ':' + o.nomes.join('+')).join('  ');
+  /* ⚠️ SEM ESTA PRIMEIRA LINHA A TRAVA MEDE O VAZIO: se os dubles deixarem de ser chamados (um
+     `refreshTrainersLeagueView` que estoure cedo, por exemplo), `ondas.length` e ZERO e todas as
+     de baixo passam. Zero nao e um resultado bom, e nao ter medido. */
+  ok('  (a medicao viu as leituras)', inicios.length >= 5, inicios.length + ' leituras');
+  ok('a abertura custa no MAXIMO 2 niveis de espera', ondas.length === 2, resumo);
+  /* ⚠️ E O NIVEL 1 E SO O CICLO: e dele que sai o `dateId`, entao ele e o unico que TEM que vir
+     antes. Todo o resto depende so dele -- e e por isso que cabe tudo no nivel 2. */
+  ok('  e o nivel 1 e so o documento do ciclo',
+     !!ondas[0] && ondas[0].nomes.length === 1 && ondas[0].nomes[0] === 'ciclo', resumo);
+  /* ⚠️ A INSCRICAO NO NIVEL 2 E O QUE CONSERTA O BOTAO QUE MENTIA: ela era o NIVEL 4, e a tela ja
+     desenhava (com o ciclo na mao) muito antes dela chegar. */
+  ok('  e a MINHA INSCRICAO chega no nivel 2, junto com a contagem',
+     !!ondas[1] && ondas[1].nomes.indexOf('minhaInscricao') >= 0 &&
+     ondas[1].nomes.indexOf('contagem') >= 0, resumo);
+  ok('  e a inscricao foi mesmo LIDA (o disparo cedo nao a perdeu)',
+     !!S9.__getGame().trainersLeagueMyRegistration,
+     JSON.stringify(S9.__getGame().trainersLeagueMyRegistration));
+
+  /* ⚠️ E ENQUANTO ELA NAO CHEGA A TELA NAO AFIRMA: 'ainda nao sei' nao e 'nao esta inscrito'.
+     E a licao do `saveSlotsCarregados` (a porta dos modos de campeao) e do `contaCarregada` (a
+     tela de nome de treinador), pela TERCEIRA vez. */
+  ok('o `carregado` fica true no fim de um refresh inteiro',
+     S9.__getGame().trainersLeagueCarregado === true);
+  const H9 = require('fs').readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
+  const iAb = H9.indexOf('function openTrainersLeague(');
+  const corpoAb = H9.slice(iAb, H9.indexOf('\n}', iAb));
+  ok('  e ele nasce FALSE ao abrir a tela', /trainersLeagueCarregado\s*=\s*false/.test(corpoAb));
+  const iBot = H9.indexOf('Inscrever-se ⚔️');
+  const volta = H9.slice(Math.max(0, iBot - 1200), iBot);
+  ok('  e a tela tem TRES estados (o botao nao aparece antes de saber)',
+     /!game\.trainersLeagueCarregado\s*\?/.test(volta), /trainersLeagueCarregado/.test(volta) ? '' : 'so dois');
+  /* ⚠️ E ELE TEM QUE ESTAR NA ASSINATURA DO REDESENHO, senao a tela fica presa no 'Carregando...'
+     ate outra coisa mudar -- a flag vira e ninguem redesenha. Falha muda, do pior tipo. */
+  const iSig = H9.indexOf('const signature = JSON.stringify([', H9.indexOf('function refreshTrainersLeagueView('));
+  const sig = H9.slice(iSig, H9.indexOf(']);', iSig));
+  ok('  e ele entra na assinatura do redesenho', /trainersLeagueCarregado/.test(sig));
+}
+
 console.log('\nO CLIQUE EM INSCREVER NAO PODE VOLTAR A CUSTAR SEIS IDAS');
 {
   const S2 = createSandbox();          // sandbox proprio: o de cima tem os colaboradores trocados

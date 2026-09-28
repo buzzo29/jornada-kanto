@@ -17825,12 +17825,48 @@ async function refreshTrainersLeagueView(fromPoll = false){
     game.trainersLeagueActiveCycleId = dateId; // guarda qual ciclo é o "meu" de verdade hoje -- outras telas (escolher terreno, trocar time) usam isso em vez de recalcular
     // contador de inscritos -- só precisa buscar durante as inscrições (é a única fase em que o
     // número ainda pode subir; depois da trava, data.players já tem a lista definitiva)
+    /* ============================================================================
+       ⚠️ AS MINHAS LEITURAS SAO DISPARADAS AQUI, e so aguardadas la embaixo -- elas nao dependem
+       de nada do que vem no meio, e sao o que decide se o botao de inscrever aparece. Em serie
+       elas eram o NIVEL 3 da abertura; disparadas aqui, elas correm junto com o nivel 2.
+       ⚠️ E O `cycleUnchanged` SUBIU JUNTO, por isso: ele e conta pura (nao tem `await`), so precisa
+       do `dateId` e do `trainersLeagueData` -- os dois ja existem neste ponto. */
+    const podeLerMinhas = !!game.authUser;
+    const cycleUnchanged = podeLerMinhas && fromPoll && game.trainersLeagueLastCycleStamp &&
+      game.trainersLeagueLastCycleStamp.dateId === dateId &&
+      game.trainersLeagueLastCycleStamp.updatedAt === (game.trainersLeagueData.updatedAt || 0) &&
+      game.trainersLeagueLastCycleStamp.status === game.trainersLeagueData.status;
+    if(podeLerMinhas){
+      game.trainersLeagueLastCycleStamp = { dateId, updatedAt: game.trainersLeagueData.updatedAt || 0,
+                                            status: game.trainersLeagueData.status };
+    }
+    /* ⚠️ O `catch` DAS ESCOLHAS E INDIVIDUAL, e o da INSCRICAO nao: uma falha ao ler o time/terreno
+       escolhido nao pode derrubar a leitura que diz se estou inscrito, mas uma falha AO LER A
+       INSCRICAO tem que subir -- a tela nao pode afirmar que nao estou inscrito sem saber. */
+    const minhasPromessa = (podeLerMinhas && !cycleUnchanged) ? Promise.all([
+      trainersLeagueRegistrantRef(dateId, game.authUser.uid).get(),
+      trainersLeagueTeamPickRef(dateId, game.authUser.uid).get().catch(() => null),
+      trainersLeagueTerrainPickRef(dateId, game.authUser.uid).get().catch(() => null)
+    ]) : null;
+
+    /* ============================================================================
+       ⚠️ AS DUAS EM PARALELO (28/09/2026), e isso e metade do "sempre demora pra carregar" que foi
+       relatado. Elas eram dois `await` EM SERIE, e as duas so precisam do `dateId` -- uma nao usa
+       a resposta da outra. Em serie sao dois niveis; juntas, um.
+       ⚠️ E O QUE CUSTA AQUI SAO OS NIVEIS, nao as operacoes: o banco esta em nam5 (multi-regiao
+       nos EUA) e cada ida do Brasil custa ~200ms. Duas em serie sao ~400ms de espera antes de a
+       contagem aparecer; juntas, ~200.
+       ⚠️ E O `catch` DE CADA UMA FICA SEPARADO: a contagem podia falhar sozinha (e mostrar "...")
+       sem derrubar a resposta de "as inscricoes ja abriram" -- juntar os dois num `catch` so faria
+       uma falha de contagem esconder a tela inteira. */
     if(game.trainersLeagueData.status === 'registering'){
-      try{
-        game.trainersLeagueRegistrantCount = await trainersLeagueCountRegistrants(dateId);
-      } catch(e){ console.error('Erro ao contar inscritos:', e); game.trainersLeagueRegistrantCount = null; }
-      // a inscrição de hoje só está aberta se a liga de ONTEM não estiver mais pendente
-      game.trainersLeaguePrevDayDone = await trainersLeaguePrevDayDone(dateId);
+      const [contagem, anteriorFeita] = await Promise.all([
+        trainersLeagueCountRegistrants(dateId)
+          .catch(e => { console.error('Erro ao contar inscritos:', e); return null; }),
+        trainersLeaguePrevDayDone(dateId)
+      ]);
+      game.trainersLeagueRegistrantCount = contagem;
+      game.trainersLeaguePrevDayDone = anteriorFeita;
     } else {
       game.trainersLeagueRegistrantCount = null;
       game.trainersLeaguePrevDayDone = null;
@@ -17853,28 +17889,21 @@ async function refreshTrainersLeagueView(fromPoll = false){
     } else {
       game.trainersLeagueNextDayInfo = null;
     }
-    if(game.authUser){
+    if(podeLerMinhas){
       // ECONOMIA nos polls: minha inscrição e meus picks só mudam por AÇÃO MINHA -- e toda ação já
       // chama refresh explícito (fromPoll=false). Então, num tick de poll em que o documento do ciclo
       // nem mudou (updatedAt idêntico ao anterior), reler esses 3 documentos é desperdício garantido.
       // O terreno do MANDANTE adversário é a exceção (muda por ação DELE) e continua sendo checado abaixo
-      const cycleUnchanged = fromPoll && game.trainersLeagueLastCycleStamp &&
-        game.trainersLeagueLastCycleStamp.dateId === dateId &&
-        game.trainersLeagueLastCycleStamp.updatedAt === (game.trainersLeagueData.updatedAt || 0) &&
-        game.trainersLeagueLastCycleStamp.status === game.trainersLeagueData.status;
-      game.trainersLeagueLastCycleStamp = { dateId, updatedAt: game.trainersLeagueData.updatedAt || 0, status: game.trainersLeagueData.status };
-      if(!cycleUnchanged){
-        const regSnap = await trainersLeagueRegistrantRef(dateId, game.authUser.uid).get();
+      /* ⚠️ O `cycleUnchanged` e o disparo das três leituras subiram pra cima do bloco da contagem
+         (ver lá) -- aqui só se AGUARDA o que já está em voo. */
+      if(minhasPromessa){
+        const [regSnap, teamPickSnap, terrainPickSnap] = await minhasPromessa;
         game.trainersLeagueMyRegistration = regSnap.exists ? regSnap.data() : null;
         // carrega as MINHAS escolhas por rodada (time e terreno) -- a tela usa isso pra mostrar o time
         // atual da próxima partida e o selo do terreno já escolhido dentro do botão
         try{
-          const [teamPickSnap, terrainPickSnap] = await Promise.all([
-            trainersLeagueTeamPickRef(dateId, game.authUser.uid).get(),
-            trainersLeagueTerrainPickRef(dateId, game.authUser.uid).get()
-          ]);
-          game.trainersLeagueMyTeamOverrides = extractRoundKeyedMap(teamPickSnap.exists ? teamPickSnap.data() : null, 'overrides');
-          game.trainersLeagueMyTerrainPicks = extractRoundKeyedMap(terrainPickSnap.exists ? terrainPickSnap.data() : null, 'picks');
+          game.trainersLeagueMyTeamOverrides = extractRoundKeyedMap(teamPickSnap && teamPickSnap.exists ? teamPickSnap.data() : null, 'overrides');
+          game.trainersLeagueMyTerrainPicks = extractRoundKeyedMap(terrainPickSnap && terrainPickSnap.exists ? terrainPickSnap.data() : null, 'picks');
         } catch(e){
           console.error('Erro ao carregar minhas escolhas por rodada:', e);
           game.trainersLeagueMyTeamOverrides = {};
@@ -17907,6 +17936,10 @@ async function refreshTrainersLeagueView(fromPoll = false){
       game.trainersLeagueMyTerrainPicks = {};
       game.trainersLeagueOpponentTerrainPick = null;
     }
+    /* ⚠️ SÓ AQUI A TELA PASSA A AFIRMAR. Esta é a última linha do `try`: se qualquer leitura acima
+       estourou, o `catch` assume e a flag fica em false -- e aí a tela mostra "carregando" em vez
+       de oferecer uma inscrição que ela não sabe se existe. */
+    game.trainersLeagueCarregado = true;
   } catch(e){
     console.error('Erro ao carregar o Trainers League:', e);
     // sem isso, um erro (ex: permissão do Firestore faltando pra essa coleção nova) deixava a tela
@@ -17922,6 +17955,7 @@ async function refreshTrainersLeagueView(fromPoll = false){
       d.status, d.updatedAt, d.currentRound,
       game.trainersLeagueRegistrantCount,
       game.trainersLeagueMyRegistration,
+      game.trainersLeagueCarregado,
       game.trainersLeagueMyTeamOverrides,
       game.trainersLeagueMyTerrainPicks,
       game.trainersLeagueOpponentTerrainPick,
@@ -17960,6 +17994,15 @@ function openTrainersLeague(){
   game.trainersLeagueLoadError = null;
   game.trainersLeagueData = null;
   game.trainersLeagueMyRegistration = null;
+  /* ⚠️ "AINDA NÃO SEI" NÃO É "NÃO ESTOU INSCRITO" (28/09/2026, relatado: *"às vezes aparece até o
+     botão de se inscrever ativo, mesmo se eu já estou inscrito"*).
+     A tela lia `myRegistration` nulo como "não inscrito" -- e ele é nulo nos DOIS casos. O
+     `trainersLeagueData` chega TRÊS idas ao servidor ANTES dele, e o `loadLeagueLeaderboard` do
+     `openTrainersLeague` roda em PARALELO e chama `render()` quando resolve: se ela cair nessa
+     janela, a tela desenha com o ciclo já carregado e a inscrição ainda não -- e oferece o botão.
+     ⚠️ É A MESMA LIÇÃO do `saveSlotsCarregados` (a porta dos modos de campeão) e do
+     `contaCarregada` (a tela de nome): enquanto não se leu, não se AFIRMA. */
+  game.trainersLeagueCarregado = false;
   game.trainersLeagueViewDateId = null;
   game.trainersLeagueViewRound = null;
   game.trainersLeagueLastRenderSignature = null; // garante que o primeiro refresh sempre redesenha (a guarda anti-piscar pularia um render com dados iguais aos da última visita, prendendo o "Carregando...")
@@ -19626,7 +19669,13 @@ function renderTrainersLeagueScreen(){
       <p>A competição começa às <strong>11h</strong> com o sorteio das rodadas. A primeira rodada é às <strong>11h30</strong>.</p>
       <p class="hint-text">${selo('amigos')} <strong>${game.trainersLeagueRegistrantCount!=null ? game.trainersLeagueRegistrantCount : '...'}</strong> treinador(es) inscrito(s).</p>
       ${game.trainersLeagueError ? `<p class="error-text">${game.trainersLeagueError}</p>` : ''}
-      ${myReg ? `
+      ${/* ⚠️ TRÊS ESTADOS, e não dois: inscrito, NÃO inscrito, e "ainda não sei". O terceiro
+           existia e era desenhado como o segundo -- oferecendo o botão a quem já estava inscrito.
+           Ver o `trainersLeagueCarregado`, no `openTrainersLeague`. */''}
+      ${!game.trainersLeagueCarregado ? `
+        <p class="hint-text">Vendo se você já está inscrito...</p>
+        <button class="btn danger" disabled>Carregando...</button>
+      ` : myReg ? `
         <p>Você está inscrito como <strong>${escapeHtmlSafe(myReg.name)}</strong>.</p>
         <p class="hint-text">Selecione um time até 5 minutos antes de cada partida. Caso não selecione, um time seu será sorteado automaticamente -- seus times elegíveis são atualizados sozinhos antes de cada rodada.</p>
         ${myReg.mewtwoTeamCode ? `<p class="hint-text">🔮 Mewtwo Lv.${MEWTWO_LOAN_LEVEL} ativado pra hoje -- pode entrar em qualquer rodada (por sorteio ou escolha manual).</p>` : ''}

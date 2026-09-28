@@ -3130,6 +3130,97 @@ composto, que também achou zero).
 
 **Os 16 defeitos religados acusam** (2 a 12 falhas cada).
 
+## A TRAINERS LEAGUE ABRIA EM CINCO NÍVEIS, E O BOTÃO MENTIA (28/09/2026)
+
+Relatado assim: *"a tela da trainers league, sempre quando eu abro demora pra carregar as
+informações de quantos treinadores já estão inscritos, e as vezes aparece até o botão de se
+inscrever ativo, mesmo se eu já estou inscrito nela"*.
+
+**São DOIS defeitos, e o segundo é consequência do primeiro** — o botão aparecia porque a tela
+desenhava antes de a inscrição chegar, e a inscrição era a **quarta** ida ao servidor.
+
+### ⚠️ O QUE CUSTA É O NÍVEL DE ESPERA, NÃO O NÚMERO DE LEITURAS
+
+O banco está em **nam5** (multi-região nos EUA) e cada ida do Brasil custa **~200ms**. Duas
+leituras **em série** custam o dobro de duas **em paralelo** — sendo duas leituras nos dois casos.
+Então a conta que importa não é quantas, é **quantas esperam umas pelas outras**.
+
+**MEDIDO, com cada leitura dublada em 20ms e anotando QUANDO começou** (leituras que começam na
+mesma janela são a mesma onda; ondas distintas são níveis em série):
+
+| | antes | agora |
+|---|---|---|
+| leituras | 6 | **6 — as mesmas** |
+| **níveis de espera** | **5** | **2** |
+| o dublê de 20ms/ida | 156ms | **60ms** |
+| **projetado em nam5 (~200ms/ida)** | **~1.000ms** | **~400ms** |
+
+As cinco ondas de antes eram: `ciclo` → `contagem` → `liga-de-ontem` → `minha-inscrição` →
+`minhas-escolhas`. **⚠️ E NENHUMA DELAS USAVA A RESPOSTA DA ANTERIOR:** todas as cinco só
+precisavam do `dateId`, que sai do relógio e não do banco. Era série por acidente de escrita.
+
+Hoje o **nível 1 é só o documento do ciclo** — é dele que sai o `status`, e é o único que tem
+mesmo que vir antes. Todo o resto cabe no **nível 2**.
+
+- **⚠️ E O `cycleUnchanged` SUBIU JUNTO**, por isso: ele é conta pura (não tem `await`), só
+  precisa do `dateId` e do `trainersLeagueData` — os dois já existem naquele ponto. Sem subi-lo,
+  o disparo antecipado não teria como saber se o poll pode pular as três leituras, e a economia
+  dos polls (que existe desde 27/09) se perderia.
+- **⚠️ O `catch` DAS ESCOLHAS É INDIVIDUAL E O DA INSCRIÇÃO NÃO**, e a assimetria é deliberada:
+  uma falha ao ler o time/terreno escolhido não pode derrubar a leitura que diz se estou inscrito,
+  mas uma falha **ao ler a inscrição** tem que subir — a tela não pode afirmar que não estou
+  inscrito sem saber.
+- **⚠️ E O `catch` DA CONTAGEM CONTINUA SEPARADO DO DA LIGA DE ONTEM:** a contagem pode falhar
+  sozinha (e mostrar `...`) sem derrubar a resposta de *"as inscrições já abriram"*. Juntar as
+  duas num `catch` só faria uma falha de contagem esconder a tela inteira.
+
+### ⚠️ E A TELA PASSOU A TER TRÊS ESTADOS, NÃO DOIS
+
+O botão ativo pra quem já estava inscrito não era sorte: **`myReg` nulo significava as duas
+coisas** — *"não está inscrito"* e *"ainda não li"* —, e a tela desenhava as duas como a primeira.
+A janela existia de verdade: o `loadLeagueLeaderboard` do `openTrainersLeague` roda em paralelo
+e chama `render()` quando resolve, e caindo nessa janela a tela desenhava com o ciclo já
+carregado e a inscrição ainda não.
+
+Hoje quem responde é o **`trainersLeagueCarregado`**: nasce `false` no `openTrainersLeague` e
+só vira `true` na **última linha do `try`** do refresh — se qualquer leitura estourou, o
+`catch` assume e ele fica falso. Enquanto isso a tela diz *"Vendo se você já está inscrito..."*
+com o botão desabilitado.
+
+**⚠️ É A MESMA LIÇÃO, PELA TERCEIRA VEZ:** o `saveSlotsCarregados` (a porta dos modos de campeão)
+e o `contaCarregada` (a tela de nome de treinador) existem pelo mesmo motivo — **enquanto não se
+leu, não se AFIRMA**. E as três erram pro mesmo lado seguro: aqui o botão some por um instante em
+vez de oferecer uma inscrição dupla.
+
+- **⚠️ E ELE TEM QUE ESTAR NA ASSINATURA DO REDESENHO.** A guarda anti-piscar só redesenha quando
+  a assinatura muda; sem o campo nela, a flag virava e **ninguém redesenhava** — a tela ficava
+  presa no *"Carregando..."* até outra coisa mudar. Falha muda, do pior tipo, e há trava.
+
+**NO MOTOR, NADA:** `MOTOR a9075d0e4899 / DIARIO 9a0ae4840b92`, idêntico — e o instrumento foi
+confirmado sensível (`--sensivel` move os dois hashes). É carregamento e apresentação inteiros.
+
+### ⚠️ E A TRAVA MEDE A CADEIA, COM UM RELÓGIO QUE NINGUÉM DUBLA
+
+Ela dubla cada leitura com 20ms e agrupa por onda. **⚠️ O relógio dela NÃO pode ser o
+`Date.now`:** um bloco anterior do mesmo arquivo o deixa **congelado**
+(`Date.now = () => t0 + 6 * 5000 + 1000`, sem restaurar) pra testar o gap do poll — e com ele
+parado **as seis leituras marcam o mesmo instante**, ou seja a trava diria *"1 nível"* com o código
+em série também. Ela usa `process.hrtime.bigint()`, que é do processo.
+
+**Isso custou uma rodada inteira em vermelho pra descobrir**, e a lição é a de sempre: *medir a
+dimensão errada dá verde (ou vermelho) em cima do nada*. **Há caso de acusação pra isso**, que
+religa o `Date.now` e cobra que a trava pare de passar.
+
+E a primeira linha dela é `(a medição viu as leituras)`: sem isso, um refresh que estourasse cedo
+daria **zero ondas** e todas as de baixo passariam. **Zero não é um resultado bom, é não ter
+medido.**
+
+`tools/test-liga-inscricao.js` tranca 9 pontas: os 2 níveis, o nível 1 sendo só o ciclo, a
+inscrição chegando no nível 2 junto da contagem, a inscrição sendo mesmo lida (o disparo cedo não
+a perdeu), o `carregado` nascendo falso e virando true só no fim, os três estados na tela, e o
+campo na assinatura. **Conferido: os 7 defeitos religados acusam** (2 a 4 falhas cada).
+
+
 ## A TELA DE ESCOLHER TERRENO VIROU UMA SÓ (28/09/2026)
 
 Pedida assim: *"faça um novo design para a tela de escolher os terrenos da trainers league e

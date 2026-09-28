@@ -263,6 +263,28 @@ game.ilhasResumo = { semanaId:'2026-09-21', pronto:true,
 add('Ilhas', 'Pódio da semana (o popup do fim de semana)', ()=>sb.renderIlhasResumoModal());
 game.ilhasResumo = null;
 
+/* ⚠️ OS TRES ESTADOS DA INSCRICAO DA TRAINERS LEAGUE (28/09/2026). Eles existem porque
+   `myReg` nulo queria dizer DUAS coisas -- "nao esta inscrito" e "ainda nao li" -- e a tela
+   desenhava as duas como a primeira, oferecendo o botao a quem ja estava inscrito.
+   Medir os tres juntos e o que mostra que o terceiro nao e uma tela a menos: ele tem a mesma
+   altura de caixa e so troca a frase e o botao. */
+game.trainersLeagueData = { status:'registering', dateId:'2026-09-28', updatedAt:1, players:[] };
+game.trainersLeagueRegistrantCount = 7;
+game.trainersLeaguePrevDayDone = true;
+game.trainersLeagueError = null;
+game.trainersLeagueSubmitting = false;
+game.trainersLeagueLoadError = null;
+game.trainersLeagueNextDayInfo = null;
+game.trainersLeagueMyRegistration = null;
+game.trainersLeagueCarregado = false;
+add('Ligas', 'Trainers League — ainda nao sei se estou inscrito', ()=>sb.renderTrainersLeagueScreen());
+game.trainersLeagueCarregado = true;
+add('Ligas', 'Trainers League — nao inscrito (o botao)', ()=>sb.renderTrainersLeagueScreen());
+game.trainersLeagueMyRegistration = { name:'Buzzo', uid:'u1' };
+add('Ligas', 'Trainers League — ja inscrito', ()=>sb.renderTrainersLeagueScreen());
+game.trainersLeagueMyRegistration = null;
+game.trainersLeagueData = null;
+
 /* ⚠️ AS DUAS TELAS DE ESCOLHER TERRENO, lado a lado -- e e assim que da pra ver que elas sao a
    MESMA escolha com duas caras: uma e lista em coluna e a outra e grade de 2 colunas, uma diz
    "Todos" com contagem e a outra sem, uma marca o chip com 'active' e a outra com 'on'. */
