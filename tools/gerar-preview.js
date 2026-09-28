@@ -93,6 +93,66 @@ add('Jornada', 'Escolha de caminho (trecho 4)', ()=>sb.renderWalkNext());
   game.golpesAprendidos = [];
 }
 
+/* ---- o quadro do lutador, com os selos na linha do HP (28/09/2026) ---- */
+/* ⚠️ O PIOR CASO NAO E ESPERAR ELE ACONTECER NUMA BATALHA: a 320px o painel da cena tem ~146px, e
+   e a MEDICAO que decide o tamanho do selo. Entao aqui o matchup e montado a mao com as marcas
+   ligadas -- do caso comum (2 selos) ao teto absoluto (13), que nao acontece no jogo mas e o unico
+   numero que diz quando a linha corta. */
+{
+  const at = ['charizard','gengar'].map(id => { const p = sb.createInstance(id, 55); p.ataques = sb.ataquesPadrao(p); return p; });
+  const df = ['onix','alakazam'].map(id => sb.createInstance(id, 55));
+  const base = sb.simulateGymBattle(at, df).matchups[0];
+  const clonar = () => JSON.parse(JSON.stringify(base));
+  const marca = (m, x, q) => { m.golpes.push({ q, d:0, hp:1, c:0, m:0, z:0, x }); };
+  const quadro = (m, op) => '<div class="battle-scene"><div class="battle-vs">' +
+    sb.fighterHtml(m, 'p', op) + '</div></div>';
+
+  /* O CASO COMUM: um shiny queimado. E o que se ve na maioria das lutas. */
+  const comum = clonar();
+  comum.playerShiny = true; comum.playerQueimado = true;
+  marca(comum, 'queimou', 'p');
+  add('Batalha', 'Quadro do lutador — 2 selos (o caso comum)', () =>
+    quadro(comum, { visualNovo:true, hp:comum.playerMaxHp, comTerreno:true, treinador:'Buzzo', vivos:4, total:6 }));
+
+  /* ⚠️ O PIOR CASO REAL SAO CINCO, E ISSO E MEDIDO, nao estimado: em 90.399 quadros de 2.500
+     batalhas o maximo simultaneo foi 5 (terreno + medalha + furia + sono + paralisia), com p99 em
+     3 e p99,9 em 4. Os 13 selos aparecem todos na amostra -- inclusive o cadeado (1,23% dos
+     quadros) e o gelo (0,106%) --, entao o 5 nao e falta de exercicio, e o teto de verdade. */
+  const real = clonar();
+  real.playerBuffed = true; real.playerSpecialty = true;
+  real.playerFuria = 3; real.playerParalisado = true;
+  marca(real, 'dormindo', 'p'); marca(real, 'paralisou', 'p');
+  add('Batalha', 'Quadro do lutador — 5 selos (o maximo MEDIDO)', () =>
+    quadro(real, { visualNovo:true, hp:Math.round(real.playerMaxHp*0.62), comTerreno:true, treinador:'Buzzo', vivos:4, total:6 }));
+  /* ⚠️ E UM DE SEIS, que o motor nao produz hoje: e a margem. Se um status novo nascer amanha, e
+     este quadro que diz se a linha ainda cabe ou se o simbolo precisa encolher de novo. */
+  const seis = clonar();
+  seis.playerShiny = true; seis.playerBuffed = true; seis.playerSpecialty = true;
+  seis.playerFuria = 3; seis.playerParalisado = true;
+  marca(seis, 'dormindo', 'p'); marca(seis, 'paralisou', 'p');
+  add('Batalha', 'Quadro do lutador — 6 selos (a margem)', () =>
+    quadro(seis, { visualNovo:true, hp:Math.round(seis.playerMaxHp*0.5), comTerreno:true, treinador:'Buzzo', vivos:3, total:6 }));
+
+  /* O TETO ABSOLUTO: 13, com combinacoes que o motor nao produz junto (dormir E congelado).
+     Ele nao e uma tela de verdade -- ele e a regua de quando o corte comeca. */
+  const teto = clonar();
+  teto.playerShiny = true; teto.playerBuffed = true; teto.playerSpecialty = true;
+  teto.playerFuria = 12; teto.playerQueimado = true; teto.playerEnvenenado = true;
+  teto.playerParalisado = true;
+  marca(teto, 'espadas', 'p'); marca(teto, 'pluma', 'e');
+  marca(teto, 'dormindo', 'p'); marca(teto, 'congelou', 'p'); marca(teto, 'confundiu', 'p');
+  marca(teto, 'queimou', 'p'); marca(teto, 'envenenou', 'p'); marca(teto, 'paralisou', 'p');
+  marca(teto, 'disable', 'e');
+  add('Batalha', 'Quadro do lutador — o TETO de 13 selos', () =>
+    quadro(teto, { visualNovo:true, hp:Math.round(teto.playerMaxHp*0.3), comTerreno:true, treinador:'Buzzo', vivos:2, total:6 }));
+
+  /* ⚠️ E O QUADRO ANTIGO (a Torre, a Pescaria, o desafio por codigo) usa a MESMA fileira: sem
+     medi-lo, a mudanca podia caber na cena e estourar la, que e uma tela mais larga mas com o
+     nome numa linha de texto corrida em vez de um flex. */
+  add('Batalha', 'Quadro ANTIGO (Torre/Pescaria) — 5 selos', () =>
+    '<div class="box"><div class="battle-vs">' + sb.fighterHtml(real, 'p', { comTerreno:true, hp:Math.round(real.playerMaxHp*0.62) }) + '</div></div>');
+}
+
 /* ---- a fileira de quem nao escolhe golpe ---- */
 /* O Togepi nao tem UM golpe de dano ate o nivel 38 e as 4 especies do METRONOMO atacam de tipo
    sorteado -- a fileira delas saia MUDA, e foi reportado. Agora ela anuncia o Metronomo, tracejado

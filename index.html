@@ -812,6 +812,24 @@
     text-align:center;
     font-weight:700;
   }
+  /* ⚠️ A LINHA DE BAIXO DA BARRA: selos à esquerda, o número à direita (28/09/2026, a pedido).
+     ⚠️ 'nowrap' + 'overflow:hidden' nos selos, e NUNCA 'flex-wrap': com wrap, uma luta com muitos
+     status empurraria os selos pra uma segunda linha e o painel CRESCERIA no meio da batalha, com
+     o cenário atrás dele -- é a mesma razão que a fileira ao lado do nome já registrava (de 22/09
+     a 28/09/2026 ela morava lá), e ali o efeito era o mesmo.
+     ⚠️ E QUEM NUNCA CEDE É O NÚMERO ('flex-shrink:0'): ele é a informação que a linha existe pra
+     mostrar. Não cabendo, o que some é o FIM da fileira de selos -- e é por isso que a ordem dela
+     é do mais permanente pro mais passageiro. */
+  .hp-bar-rodape{display:flex;align-items:center;gap:4px;margin-top:3px;min-width:0;}
+  .hp-bar-rodape .hp-bar-label{margin-top:0;margin-left:auto;flex-shrink:0;}
+  .hp-bar-selos{
+    display:flex;align-items:center;gap:2px;flex-wrap:nowrap;
+    min-width:0;overflow:hidden;line-height:1;
+    font-size:.6rem;font-weight:800;color:var(--muted);
+  }
+  /* ⚠️ O NÚMERO DA FÚRIA ANDA COLADO NO SELO DELA: solto no flex ele vira um item próprio e o
+     'gap' o separa do 😤, e aí ele se lê como um selo a mais em vez de "fúria 2". */
+  .hp-bar-selos .selo-num{display:inline-flex;align-items:center;gap:1px;flex:0 0 auto;}
 
   .team-alive-row{display:flex;justify-content:space-between;gap:8px;margin:10px 0;flex-wrap:wrap;}
   .team-alive-chip{
@@ -1104,16 +1122,17 @@
   .battle-mon-head{display:flex;align-items:center;gap:6px;min-width:0;margin-bottom:3px;}
   .battle-mon-name{font-weight:800;font-size:.85rem;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .battle-mon-head .fighter-level{margin-left:auto;flex-shrink:0;font-size:.62rem;}
-  /* ⚠️ OS SELOS SÃO INLINE, AO LADO DO NOME (22/09/2026) -- eles eram uma linha própria embaixo
-     dele. `flex-shrink:0` e `nowrap` porque quem cede espaço é o NOME: sem os dois, uma luta com
-     queimadura + veneno + fúria empurrava os selos pra uma segunda linha e o painel crescia no
-     meio da batalha, com o cenário atrás dele. */
-  .battle-mon-badges{display:flex;align-items:center;gap:3px;flex-wrap:nowrap;flex-shrink:0;}
+  /* ⚠️ A CABEÇA DO QUADRO FICOU SÓ COM O NOME E O NÍVEL (28/09/2026): os selos desceram pra a
+     linha do número de HP, e com isso o nome deixou de ceder espaço a eles -- ele passou a ter a
+     largura inteira menos o 'Lv.'. Ver o '.hp-bar-rodape'. */
+
   .battle-scene .battle-mon-panel .fighter-types{justify-content:flex-start;margin:4px 0 3px;}
   .battle-scene .battle-mon-panel .type-pill{font-size:.48rem;padding:1px 5px;}
   .battle-scene .battle-mon-panel .hp-bar-wrap{margin-top:4px;}
   .battle-scene .battle-mon-panel .hp-bar-track{height:10px;border-width:2px;}
   .battle-scene .battle-mon-panel .hp-bar-label{text-align:right;font-size:.56rem;margin-top:2px;}
+  .battle-scene .battle-mon-panel .hp-bar-rodape{margin-top:2px;}
+  .battle-scene .battle-mon-panel .hp-bar-rodape .hp-bar-label{margin-top:0;}
 
   /* O PÉ de cada lutador sai de âncoras proporcionais ao cenário (TERRAIN_BATTLE_FOOTING); o
      piso faz parte da arte. A SOMBRA não sai mais daqui -- ver o `.battle-sprite-wrap::after`. */
@@ -3265,6 +3284,12 @@
   .selo{ width:1em; height:1em; vertical-align:-.15em; flex:0 0 auto; }
   /* no quadro do lutador eles sao a informacao, e nao um enfeite no meio da frase */
   .selo-g{ width:1.15em; height:1.15em; vertical-align:-.2em; }
+  /* ⚠️ O SELO PEQUENO É EM 'rem', E NÃO EM 'em' COMO OS OUTROS DOIS (28/09/2026). Ele vive na
+     linha do número de HP, cuja fonte muda de lugar pra lugar (.56rem na cena nova, .62rem no
+     quadro antigo) -- em 'em' ele mudaria de tamanho junto, e o pior caso (a cena, que é a tela
+     mais apertada) é justamente onde ele ficaria menor. Em 'rem' os dois quadros mostram o MESMO
+     símbolo, do mesmo tamanho. */
+  .selo-p{ width:.82rem; height:.82rem; vertical-align:-.15em; }
   /* ⚠️ O SELO DA HOME e maior e NAO desce a linha de base: ali ele nao esta no meio de uma
      frase, ele e o icone do card -- centralizado, com o rotulo embaixo. */
   /* ⚠️ 32px FIXOS, e nao 1em: os outros dois cards da fileira (Pokedex e Conquistas) usam o
@@ -27431,14 +27456,26 @@ function passosHtml(m){
    o valor velho, outro com o novo) pra existir, e aqui há UM só -- o pokémon aparece do nada. O
    `@keyframes` sem `to` usa o valor computado do elemento como destino, então ela chega exatamente
    no HP que ele tem, seja ele qual for. */
-function renderHpBar(hp, maxHp, fillId, labelId, entrando){
+/* ⚠️ `selos` PÕE OS SÍMBOLOS DE STATUS NA MESMA LINHA DO NÚMERO (28/09/2026, a pedido:
+   *"em vez de ficar aparecendo do lado direito do nome do pokémon, vamos colocar embaixo da barra
+   de HP, na mesma linha que aparece o número de quanto de HP o pokémon tá ... mais alinhado do
+   lado esquerdo"*).
+   ⚠️ ELES SÃO IRMÃOS DO RÓTULO, NUNCA FILHOS, e isso não é organização -- é o que faz a feature
+   existir: as CINCO telas de revelação atualizam a vida com `label.textContent = '300/400 HP'`,
+   e `textContent` APAGA todo o conteúdo do elemento. Dentro do rótulo, os selos apareceriam no
+   primeiro quadro e sumiriam no primeiro golpe -- e a tela continuaria parecendo certa.
+   ⚠️ E O RAMO SEM SELOS SAI BYTE A BYTE COMO ANTES: são 8 outros chamadores (o mlog, a Elite, o
+   Boss, o online, a Pescaria, o card do time) e nenhum deles pode ganhar um elemento a mais por
+   causa disto. Há trava comparando os dois ramos. */
+function renderHpBar(hp, maxHp, fillId, labelId, entrando, selos){
   const pct = Math.max(0, Math.min(100, (hp/maxHp)*100));
+  const rotulo = `<div class="hp-bar-label" id="${labelId}">${Math.max(0,hp)}/${maxHp} HP</div>`;
   return `
   <div class="hp-bar-wrap">
     <div class="hp-bar-track">
       <div class="hp-bar-fill ${hpBarClass(pct)}${entrando ? ' hp-bar-entra' : ''}" id="${fillId}" style="transform:scaleX(${pct/100})"></div>
     </div>
-    <div class="hp-bar-label" id="${labelId}">${Math.max(0,hp)}/${maxHp} HP</div>
+    ${selos ? `<div class="hp-bar-rodape"><span class="hp-bar-selos">${selos}</span>${rotulo}</div>` : rotulo}
   </div>`;
 }
 
@@ -27609,43 +27646,50 @@ function statusAteAqui(m, lado, passo, marca){
   if(i < 0) return true;
   return passo >= i + 1;
 }
+/* ⚠️ OS CINCO STATUS PASSARAM A SAIR DA MESMA MÁQUINA QUE A ARTE SOBRE O SPRITE (28/09/2026).
+   Eram DUAS leituras do mesmo estado: esta função lia o campo do matchup mais o `statusAteAqui`,
+   e a `statusVisuaisDaSequencia` reconstruía tudo da sequência -- e elas não concordavam. O sono
+   e a confusão tinham arte sobre o sprite e NENHUM selo; a queimadura, o veneno e a paralisia
+   tinham os dois; e o CONGELAMENTO tinha arte e nenhum selo, o que era o pior caso: um pokémon
+   que perde a vez sem nada na lista dizendo por quê.
+   ⚠️ E ISSO NÃO É DUPLICAÇÃO NOVA -- é o fim de uma inconsistência. Queimadura, veneno e paralisia
+   JÁ apareciam nos dois lugares desde 22/09; sono, gelo e confusão eram a exceção.
+   ⚠️ E A MÁQUINA ESCOLHIDA FOI A DA SEQUÊNCIA porque ela é a que sabe MAIS: ela trata o herdado
+   pelo campo do matchup (como esta fazia), o `acordou`/`degelou`/`saiuConfusao` (que esta não
+   tratava) e o passo de cada um. Ela é a fonte, e o selo é mais um leitor dela. */
+const SELO_DO_STATUS = { sleep:'sono', freeze:'gelo', confusion:'confusao',
+                         burn:'fogo', poison:'veneno', paralysis:'raio' };
+/* ⚠️ A ORDEM É DO QUE MAIS MUDA A JOGADA PRO QUE MENOS: os três primeiros fazem o pokémon PERDER
+   A VEZ, e os três últimos mexem em dano ou atributo. Numa linha que corta o excedente, o que tem
+   que sobreviver ao corte é o começo -- e `Object.keys` de um objeto literal preserva a ordem
+   de escrita, então esta linha É a ordem na tela. */
 function selosDoConfronto(m, lado, passo){
   const g = (m && m.golpes) || [];
   let out = "";
-  if(g.some(x => x.x === 'espadas' && x.q === lado)) out += ' ' + selo('espada', 'selo-g');
-  if(g.some(x => x.x === 'pluma' && x.q !== lado)) out += ' ' + selo('pluma', 'selo-g');
+  if(g.some(x => x.x === 'espadas' && x.q === lado)) out += ' ' + selo('espada', 'selo-p');
+  if(g.some(x => x.x === 'pluma' && x.q !== lado)) out += ' ' + selo('pluma', 'selo-p');
   const furia = (lado === 'p') ? (m && m.playerFuria) : (m && m.enemyFuria);
-  if(furia > 0) out += ' ' + selo('furia', 'selo-g') + (furia > 1 ? furia : '');
-  /* ⚠️ A QUEIMADURA E O TERCEIRO SELO QUE VEM DE CAMPO e nao de marca, pelo mesmo motivo da furia:
-     ela ATRAVESSA confrontos. E ela e a que mais precisa aparecer -- o jogador esta vendo o proprio
-     pokemon bater metade do que batia, e sem o selo nao ha nada na tela dizendo por que.
-     Confronto gravado antes do campo sai sem selo: log velho nao pode sumir. */
-  /* ⚠️ E O 🔥 SO APARECE NO PASSO EM QUE A QUEIMADURA ACONTECE (16/09/2026, reportado: *"o emoji
-     ta aparecendo logo quando o pokemon entra na luta, mesmo se o golpe que for dar o queimar for
-     tipo o sexto golpe"*). Ele saia do CAMPO do matchup, que e o estado no FIM do confronto --
-     entao o selo entregava, no primeiro quadro, uma queimadura que so ia acontecer seis golpes
-     depois.
-     ⚠️ ELE E O CONTRARIO DOS OUTROS QUATRO SELOS DESTE QUADRO, e e por isso que ele precisou de
-     regra propria: o 🌟, o 🔺, o 🎖️, o ⚔️ e o 🪶 valem o confronto inteiro porque sao ABERTURA (ja
-     sao verdade antes do primeiro golpe). A queimadura acontece NO MEIO, como a Faixa de Foco --
-     e a Faixa fica escondida ate o passo dela pelo mesmo motivo.
-     ⚠️ MAS A QUEIMADURA HERDADA CONTINUA VALENDO DESDE O PRIMEIRO QUADRO: quem entra no confronto
-     JA queimado nao tem marca no diario, e ali o selo e verdade desde o comeco. E o campo que
-     responde isso, e a marca que diz "foi AQUI". */
-  const queimado = (lado === 'p') ? (m && m.playerQueimado) : (m && m.enemyQueimado);
-  if(queimado && statusAteAqui(m, lado, passo, 'queimou')) out += ' ' + selo('fogo', 'selo-g');
-  /* O 🟣 segue a MESMA regra do 🔥: ele so aparece no passo em que o veneno pega, porque ele
-     tambem acontece NO MEIO do confronto. Envenenamento HERDADO (sem marca no diario) vale desde
-     o primeiro quadro. */
-  const envenenado = (lado === 'p') ? (m && m.playerEnvenenado) : (m && m.enemyEnvenenado);
-  if(envenenado && statusAteAqui(m, lado, passo, 'envenenou')) out += ' ' + selo('veneno', 'selo-g');
-  /* ⚠️ O ⚡ SEGUE A MESMA REGRA DO 🔥 E DO 🟣: ele so aparece a partir do passo em que a paralisia
-     pega, porque ela acontece NO MEIO do confronto. Paralisia HERDADA (sem marca no diario) vale
-     desde o primeiro quadro -- o pokemon entra ja paralisado. */
-  const paralisado = (lado === 'p') ? (m && m.playerParalisado) : (m && m.enemyParalisado);
-  if(paralisado && statusAteAqui(m, lado, passo, 'paralisou')) out += ' ' + selo('raio', 'selo-g');
+  if(furia > 0) out += ' <span class="selo-num">' + selo('furia', 'selo-p') + (furia > 1 ? furia : '') + '</span>';
+  /* ⚠️ A FÚRIA NÃO ENTRA NA MÁQUINA DE STATUS, e é decisão: ela ACUMULA por batalha, então um
+     pokémon atravessa três confrontos furioso com a marca do diário só no primeiro. Ela sai do
+     CAMPO (`playerFuria`), e é por isso que o número sai junto a partir da segunda vez. */
+  const seq = sequenciaDoConfronto(m);
+  for(const k of statusVisuaisDaSequencia(m, lado, passo, seq)){
+    if(SELO_DO_STATUS[k]) out += ' ' + selo(SELO_DO_STATUS[k], 'selo-p');
+  }
+  /* ⚠️ O GOLPE ANULADO É O ÚNICO SELO CUJO DONO É O LADO OPOSTO DA MARCA (28/09/2026, a pedido:
+     *"quando ele teve algum golpe que foi desarmado"*). O `q` do `disable` é de QUEM ANULOU --
+     a frase do log é *"X teve o ataque Y anulado por Z"*, e o `q` é o Z. Lido como os outros, o
+     cadeado apareceria no pokémon ERRADO, e a tela continuaria parecendo certa.
+     (É a mesma inversão que a Dança da Pluma já usa uma linha acima, e o contrário da armadilha
+     que a conta do cadáver pagou em 25/09 com o `q` da queimadura.)
+     ⚠️ E ELE SÓ APARECE A PARTIR DO PASSO DA ANULAÇÃO: desde 25/09 o Disable é golpe da TROCA e
+     não mais abertura, então ele acontece no MEIO -- a mesma regra do 🔥. */
+  const iAnul = seq.findIndex(x => x.x === 'disable' && x.q !== lado);
+  if(iAnul >= 0 && (passo == null || passo >= iAnul + 1)) out += ' ' + selo('cadeado', 'selo-p');
   return out;
 }
+
 /* O PLACAR DE QUEM ESTÁ DE PÉ: nome centralizado e uma POKÉBOLA por pokémon do time (15/09/2026,
    a pedido: *"voce vai criar sprites de pokebolas, caso o usuário tenha 5 pokemons vai aparecer 5
    pokebolas, conforme os pokemons forem morrendo as pokebolas vao ficando pretinhas ... e pode
@@ -27694,6 +27738,18 @@ function pokebolasHtml(vivos, total){
    que não sabe qual é o terreno). Sem um padrão, o `currentColor` do selo herdaria a cor do NOME
    do pivô -- azul no jogador e vermelho no adversário --, que é o pior dos dois mundos. */
 const COR_TERRENO_PADRAO = '#7ec850';
+/* ⚠️ A FILEIRA DE SELOS DO QUADRO, montada num lugar só (28/09/2026). Ela estava escrita DUAS
+   vezes -- uma na cena nova (o `badges`) e outra inline no caminho antigo --, e as duas ficaram
+   idênticas por sorte: é o mesmo formato de defeito que o log e a animação já produziram aqui mais
+   de uma vez (a tela dizendo uma coisa e a outra dizendo outra).
+   ⚠️ A ORDEM É DELIBERADA, e ela é do mais PERMANENTE pro mais passageiro: primeiro o que o
+   pokémon É (shiny, terreno, especialidade -- verdade o confronto inteiro), depois o que está
+   ACONTECENDO com ele (as duas danças, a fúria, os cinco status). Numa linha que corta o excedente,
+   o que precisa sobreviver ao corte é o começo. */
+function selosDoQuadro(m, lado, op, o){
+  op = op || {}; o = o || {};
+  return `${o.shiny ? selo('shiny','selo-p') : ''}${(op.comTerreno && o.buffed) ? selo('terreno','selo-p', op.corDoTerreno || COR_TERRENO_PADRAO) : ''}${o.especialidade ? selo('medalha_ouro','selo-p') : ''}${o.saindo ? '' : selosDoConfronto(m, lado, op.passo)}`;
+}
 function fighterHtml(m, lado, op){
   op = op || {};
   const doJogador = lado === 'p';
@@ -27743,7 +27799,7 @@ function fighterHtml(m, lado, op){
      sem efeito colateral: sem `op.visualNovo` este ramo inteiro nao existe. */
   if(op.visualNovo){
     const side = doJogador ? 'player' : 'enemy';
-    const badges = `${shiny ? selo('shiny','selo-g') : ''}${(op.comTerreno && buffed) ? selo('terreno','selo-g', op.corDoTerreno || COR_TERRENO_PADRAO) : ''}${especialidade ? selo('medalha_ouro','selo-g') : ''}${saindo ? '' : selosDoConfronto(m, lado, op.passo)}`;
+    const badges = selosDoQuadro(m, lado, op, { shiny, buffed, especialidade, saindo });
     const morto = hp <= 0 && !saindo;
     const explodiu = !saindo && caiuNaExplosao(m, side) && sequenciaDoConfronto(m).slice(0, op.passo == null ? Infinity : op.passo).some(g => g.x === 'boom');
     /* ⚠️ O TREINADOR E AS POKÉBOLAS MORAM NO PAINEL (22/09/2026, a pedido: *"vamos agora colocar
@@ -27762,21 +27818,20 @@ function fighterHtml(m, lado, op){
         </div>`;
     return `<div class="fighter battle-fighter ${side}${entrando ? ' fighter-entra' : ''}${morto ? ' battle-fainted' : ''}" id="battle-fighter-${side}">
       <div class="battle-mon-panel">${placar}
-        ${/* ⚠️ OS SELOS FICAM AO LADO DO NOME (22/09/2026, a pedido: *"os status que o pokemon ta
-             tendo, como queimado, buff pelo terreno, shiny, deixe ao lado do nome, hoje esta
-             exibindo numa linha embaixo"*). Eles moravam numa linha PRÓPRIA embaixo -- e ali eles
-             se liam como uma segunda informação, quando o que eles são é um adjetivo do pokémon
-             que está escrito ao lado.
-             ⚠️ QUEM CEDE ESPAÇO É O NOME, nunca os selos: a mesma regra do chip do placar. O nome
-             já trunca (`min-width:0` + ellipsis) e os selos não encolhem -- eles são a informação
-             que muda durante a luta, e o nome é o que o jogador já sabe. */''}
+        ${/* ⚠️ OS SELOS DESCERAM PRA LINHA DO NÚMERO DE HP (28/09/2026, a pedido). Eles já tinham
+             saído de uma linha própria embaixo pra o lado do nome em 22/09 -- e ali eles brigavam
+             pelo espaço com ele: a 320px o painel tem ~146px, e com quatro selos o nome de um
+             Charizard já truncava. A linha do HP é onde eles cabem sem tirar nada de ninguém,
+             porque ali só existe um número curto e ele mora na direita.
+             ⚠️ E O NOME PAROU DE CEDER: com os selos fora do `.battle-mon-head`, ele passou a ter
+             a largura inteira menos o `Lv.`. Era essa a regra antiga ("quem cede espaço é o
+             nome") e ela deixou de ser necessária. */''}
         <div class="battle-mon-head">
           <span class="battle-mon-name">${nome}</span>
-          <span class="battle-mon-badges">${badges}</span>
           <span class="fighter-level">Lv.${nivel}</span>
         </div>
         <div class="fighter-types">${sp ? typesHtml(sp.types) : ''}</div>
-        ${renderHpBar(hp, maxHp, doJogador ? 'hp-fill-player' : 'hp-fill-enemy', doJogador ? 'hp-label-player' : 'hp-label-enemy', entrando)}
+        ${renderHpBar(hp, maxHp, doJogador ? 'hp-fill-player' : 'hp-fill-enemy', doJogador ? 'hp-label-player' : 'hp-label-enemy', entrando, badges)}
       </div>
       <div class="battle-ground-base ${battleGroundBaseClass(especie)}"></div>
       <div class="fighter-emoji battle-sprite-stage${explodiu ? ' battle-exploded' : ''}" id="battle-sprite-${side}">
@@ -27803,9 +27858,9 @@ function fighterHtml(m, lado, op){
              ⚠️ E ELE NÃO PODE TER CRASE NENHUMA: o comentário vive dentro de um template literal, e
              uma crase ímpar aqui FECHA a string -- o node --check acusa, mas com um número PAR de
              crases ele passa e a tela quebra só no navegador. */''}
-        <div class="fighter-emoji">${sp ? battleSpriteHtml(especie, contra, 'sprite-lg', shiny, doJogador) : ''}</div>${nome}${shiny?' '+selo('shiny','selo-g'):''}${(op.comTerreno && buffed)?' '+selo('terreno','selo-g', op.corDoTerreno || COR_TERRENO_PADRAO):''}${especialidade?' '+selo('medalha_ouro','selo-g'):''}${saindo?'':selosDoConfronto(m, lado, op.passo)} <span class="fighter-level">Lv.${nivel}</span>
+        <div class="fighter-emoji">${sp ? battleSpriteHtml(especie, contra, 'sprite-lg', shiny, doJogador) : ''}</div>${nome} <span class="fighter-level">Lv.${nivel}</span>
         <div class="fighter-types">${sp ? typesHtml(sp.types) : ''}</div>
-        ${renderHpBar(hp, maxHp, doJogador ? 'hp-fill-player' : 'hp-fill-enemy', doJogador ? 'hp-label-player' : 'hp-label-enemy', entrando)}
+        ${renderHpBar(hp, maxHp, doJogador ? 'hp-fill-player' : 'hp-fill-enemy', doJogador ? 'hp-label-player' : 'hp-label-enemy', entrando, selosDoQuadro(m, lado, op, { shiny, buffed, especialidade, saindo }))}
       </div>`;
 }
 /* Sprites padrão de líderes: https://play.pokemonshowdown.com/sprites/trainers/

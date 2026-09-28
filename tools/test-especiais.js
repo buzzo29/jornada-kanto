@@ -6180,8 +6180,12 @@ console.log('\n=== OS SELOS DAS DUAS DANCAS (14/09/2026) ===');
     const a = mk('scyther', 50), b = mk('machop', 50);
     const d = []; S.tentarDancas(a, b, () => 0.001, d);
     const m = { player: a.name, enemy: b.name, golpes: d };
-    ok('so espadas: o selo vai em quem usou', S.selosDoConfronto(m, 'p') === ' ' + ESPADA &&
-       S.selosDoConfronto(m, 'e') === '', JSON.stringify(S.selosDoConfronto(m, 'p')));
+    /* ⚠️ POR SELO E NAO POR IGUALDADE DE STRING: a comparacao exata fixava a CLASSE do selo
+       ('selo-g'), e ela mudou pra 'selo-p' em 28/09 quando a fileira desceu pra linha do HP --
+       a trava caiu sem defeito nenhum. O que ela quer dizer e "o selo vai em quem usou". */
+    ok('so espadas: o selo vai em quem usou',
+       temSelo(S.selosDoConfronto(m, 'p'), 'espada') && !temSelo(S.selosDoConfronto(m, 'e'), 'espada') &&
+       S.selosDoConfronto(m, 'e').trim() === '', JSON.stringify(S.selosDoConfronto(m, 'p')));
   }
   /* SO PLUMA: o selo vai no OUTRO */
   {
@@ -6189,7 +6193,7 @@ console.log('\n=== OS SELOS DAS DUAS DANCAS (14/09/2026) ===');
     const d = []; S.tentarDancas(a, b, () => 0.001, d);
     const m = { player: a.name, enemy: b.name, golpes: d };
     ok('so pluma: o selo vai em quem SOFREU, nao em quem usou',
-       S.selosDoConfronto(m, 'p') === ' ' + PLUMA && S.selosDoConfronto(m, 'e') === '',
+       temSelo(S.selosDoConfronto(m, 'p'), 'pluma') && S.selosDoConfronto(m, 'e').trim() === '',
        'p=' + JSON.stringify(S.selosDoConfronto(m, 'p')) + '  e=' + JSON.stringify(S.selosDoConfronto(m, 'e')));
   }
   /* SEM DANCA NENHUMA: nada de selo */
@@ -6216,8 +6220,189 @@ console.log('\n=== OS SELOS DAS DUAS DANCAS (14/09/2026) ===');
          html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 50));
       /* ⚠️ QUEM ESTA SAINDO DE CAMPO (o quadro do Remoinho) NAO leva selo: o efeito e de quem esta
          lutando agora. */
-      const cli = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
-      ok('e quem esta saindo de campo nao leva', /\$\{saindo\?''\:selosDoConfronto\(m, lado, op\.passo\)\}/.test(cli));
+      /* ⚠️ MEDIDO E NAO LIDO: esta trava procurava o TEXTO da chamada no index.html, e ele mudou
+         de forma em 28/09 quando a fileira virou o 'selosDoQuadro' -- ela caiu sem defeito. Hoje
+         ela exercita a funcao, que e o que a regra quer dizer. */
+      const comum  = S.selosDoQuadro(alvo, 'p', { passo: 99, comTerreno: true }, { saindo: false });
+      const saindo = S.selosDoQuadro(alvo, 'p', { passo: 99, comTerreno: true }, { saindo: true });
+      ok('e quem esta saindo de campo nao leva',
+         temSelo(comum, 'espada') && temSelo(comum, 'pluma') &&
+         !temSelo(saindo, 'espada') && !temSelo(saindo, 'pluma'),
+         'saindo=' + JSON.stringify(saindo));
+    }
+  }
+
+  /* ==========================================================================================
+     OS SELOS DESCERAM PRA LINHA DO NUMERO DE HP (28/09/2026, a pedido) */
+  {
+    const cli = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
+    const mk2 = (id, nv) => { const p = S.createInstance(id, nv); p.ataques = S.ataquesPadrao(p); return p; };
+    const base = S.simulateGymBattle([mk2('charizard',55)], [mk2('onix',55)]).matchups[0];
+    const cl = () => JSON.parse(JSON.stringify(base));
+
+    /* ⚠️ A TRAVA QUE IMPORTA: OS SELOS SAO IRMAOS DO ROTULO, NUNCA FILHOS. As cinco telas de
+       revelacao atualizam a vida com `label.textContent = '300/400 HP'`, e `textContent` APAGA
+       tudo que estiver dentro do elemento. Dentro do rotulo, os selos sairiam no primeiro quadro
+       e sumiriam no primeiro golpe -- e a tela continuaria parecendo certa ate o primeiro golpe.
+       Nenhuma assertiva de 'o selo esta no HTML' pegaria isso. */
+    {
+      const html = S.renderHpBar(50, 100, 'f1', 'l1', false, S.selo('fogo','selo-p'));
+      const iSelo = html.indexOf('#s-fogo'), iLab = html.indexOf('class="hp-bar-label"');
+      const dentroDoRotulo = /<div class="hp-bar-label"[^>]*>[^<]*<svg/.test(html);
+      ok('os selos ficam FORA do rotulo (o textContent da animacao os apagaria)',
+         iSelo >= 0 && iLab >= 0 && !dentroDoRotulo && iSelo < iLab, html.replace(/\s+/g,' ').slice(0,150));
+      ok('  e os dois vivem na MESMA linha (o rodape)', /class="hp-bar-rodape"/.test(html));
+      /* ⚠️ E A ANIMACAO DE VERDADE USA `textContent`: sem esta linha, a de cima vira uma regra sem
+         motivo, e alguem a 'simplifica' pondo os selos dentro do rotulo. */
+      ok('  e a animacao escreve o rotulo com textContent (e por isso que a de cima existe)',
+         /(playerLabel|label)\.textContent\s*=/.test(cli));
+    }
+
+    /* ⚠️ E O RAMO SEM SELOS SAI BYTE A BYTE COMO ANTES: sao 8 outros chamadores (o mlog, a Elite,
+       o Boss, o online, a Pescaria, o card do time) e nenhum deles pode ganhar um elemento novo
+       por causa desta mudanca. */
+    {
+      const sem = S.renderHpBar(50, 100, 'f1', 'l1', false);
+      const esperado = '\n  <div class="hp-bar-wrap">\n    <div class="hp-bar-track">\n' +
+        '      <div class="hp-bar-fill ' + S.hpBarClass(50) + '" id="f1" style="transform:scaleX(0.5)"></div>\n' +
+        '    </div>\n    <div class="hp-bar-label" id="l1">50/100 HP</div>\n  </div>';
+      ok('sem selos a barra sai byte a byte como antes', sem === esperado, JSON.stringify(sem));
+      const chamadas = cli.split('\n').filter(l => l.indexOf('renderHpBar(') >= 0 &&
+                                                    l.indexOf('function renderHpBar(') < 0);
+      const comSelos = chamadas.filter(l => /badges|selosDoQuadro/.test(l));
+      ok('  e so o quadro do lutador passa selos (os outros 7 chamadores, nao)',
+         chamadas.length >= 9 && comSelos.length === 2,
+         comSelos.length + ' de ' + chamadas.length + ' chamadas');
+    }
+
+    /* ⚠️ E OS SELOS SAIRAM DE AO LADO DO NOME: o `.battle-mon-badges` nao existe mais. Sem esta
+       linha, alguem os desenha nos DOIS lugares e a tela diz a mesma coisa duas vezes. */
+    ok('o quadro nao tem mais a fileira ao lado do nome',
+       cli.indexOf('battle-mon-badges') < 0, 'ainda ha .battle-mon-badges');
+    {
+      const m = cl(); m.playerQueimado = true; m.golpes.push({ q:'p', d:0, hp:1, c:0, m:0, z:0, x:'queimou' });
+      const html = S.fighterHtml(m, 'p', { visualNovo:true, hp:10, comTerreno:true });
+      const iCabeca = html.indexOf('battle-mon-head'), iRodape = html.indexOf('hp-bar-rodape');
+      const iFogo = html.indexOf('#s-fogo');
+      ok('  e na cena o selo sai DEPOIS da barra, no rodape',
+         iCabeca >= 0 && iRodape > iCabeca && iFogo > iRodape, 'cabeca=' + iCabeca + ' rodape=' + iRodape + ' fogo=' + iFogo);
+      const antigo = S.fighterHtml(m, 'p', { hp:10, comTerreno:true });
+      ok('  e o quadro ANTIGO (Torre, Pescaria) tambem',
+         antigo.indexOf('hp-bar-rodape') >= 0 && antigo.indexOf('#s-fogo') > antigo.indexOf('hp-bar-rodape'));
+    }
+
+    /* ⚠️ OS TRES SELOS NOVOS: dormindo, confuso e o golpe anulado (a pedido). */
+    {
+      const dorme = cl(); dorme.golpes.push({ q:'p', d:0, hp:1, c:0, m:0, z:0, x:'dormindo' });
+      ok('o pokemon dormindo ganha selo', temSelo(S.selosDoConfronto(dorme, 'p'), 'sono'));
+      const conf = cl(); conf.golpes.push({ q:'p', d:0, hp:1, c:0, m:0, z:0, x:'confundiu' });
+      ok('o pokemon confuso ganha selo', temSelo(S.selosDoConfronto(conf, 'p'), 'confusao'));
+      /* ⚠️ O CONGELAMENTO VEIO DE GRACA e e o mais importante dos quatro: ele faz o pokemon
+         perder a vez e nao tinha selo nenhum -- so a arte sobre o sprite, que o caminho ANTIGO
+         (a Torre, a Pescaria) nem desenha. */
+      const gelo = cl(); gelo.golpes.push({ q:'p', d:0, hp:1, c:0, m:0, z:0, x:'congelou' });
+      ok('e o congelado tambem (ele nao tinha selo nenhum antes)', temSelo(S.selosDoConfronto(gelo, 'p'), 'gelo'));
+
+      /* ⚠️ O GOLPE ANULADO E O UNICO SELO CUJO DONO E O LADO OPOSTO DA MARCA: o `q` do `disable`
+         e de QUEM ANULOU (a frase e 'X teve o ataque Y anulado por Z', e o `q` e o Z). Lido como
+         os outros, o cadeado apareceria no pokemon ERRADO -- e a tela continuaria plausivel. */
+      const anul = cl(); anul.golpes.push({ q:'e', d:0, hp:1, c:0, m:0, z:0, x:'disable', a:'Ice' });
+      ok('o golpe anulado ganha selo, em QUEM PERDEU o golpe',
+         temSelo(S.selosDoConfronto(anul, 'p'), 'cadeado'), JSON.stringify(S.selosDoConfronto(anul, 'p')));
+      ok('  e NAO em quem anulou', !temSelo(S.selosDoConfronto(anul, 'e'), 'cadeado'),
+         JSON.stringify(S.selosDoConfronto(anul, 'e')));
+      /* ⚠️ E SO A PARTIR DO PASSO DELE: desde 25/09 o Disable e golpe da TROCA e nao mais
+         abertura, entao ele acontece no MEIO -- a mesma regra do 🔥, que ja custou um relato. */
+      const iAnul = S.sequenciaDoConfronto(anul).findIndex(x => x.x === 'disable');
+      ok('  e so a partir do passo da anulacao', iAnul >= 0 &&
+         !temSelo(S.selosDoConfronto(anul, 'p', iAnul), 'cadeado') &&
+         temSelo(S.selosDoConfronto(anul, 'p', iAnul + 1), 'cadeado'), 'i=' + iAnul);
+    }
+
+    /* ⚠️ O SELO E A ARTE SOBRE O SPRITE LEEM A MESMA MAQUINA (`statusVisuaisDaSequencia`). Eram
+       DUAS leituras do mesmo estado e elas NAO concordavam: sono, gelo e confusao tinham arte e
+       nenhum selo. Dizer a mesma coisa por dois caminhos e como a tela e o log divergiram aqui
+       mais de uma vez. */
+    {
+      const SELO_DE = { sleep:'sono', freeze:'gelo', confusion:'confusao', burn:'fogo', poison:'veneno', paralysis:'raio' };
+      let pares = 0, divergiu = 0;
+      for(const marca of ['dormindo','congelou','confundiu','queimou','envenenou','paralisou']){
+        const m = cl(); m.golpes.push({ q:'p', d:0, hp:1, c:0, m:0, z:0, x:marca });
+        const arte = S.statusVisuaisDaSequencia(m, 'p', null, S.sequenciaDoConfronto(m));
+        const selos = S.selosDoConfronto(m, 'p');
+        for(const k of arte){ pares++; if(SELO_DE[k] && !temSelo(selos, SELO_DE[k])) divergiu++; }
+      }
+      ok('todo status com arte sobre o sprite tem selo na linha do HP',
+         pares >= 6 && divergiu === 0, pares + ' pares, ' + divergiu + ' divergindo');
+    }
+
+    /* ⚠️ A FILEIRA E MONTADA NUM LUGAR SO, e esta trava LE O CODIGO porque a de comportamento
+       nao pega: uma copia identica da montagem produz o MESMO html, entao comparar os dois ramos
+       fica verde. Foi a conferencia de acusacao que cobrou -- religando a duplicacao, nenhuma
+       trava caiu ("MUDO"). O que essa duplicacao custa nao e hoje: e o primeiro ajuste, quando
+       uma das duas muda e a outra nao. E este arquivo ja pagou isso entre o log e a animacao.
+       A regra: os tres selos PERMANENTES so podem ser montados dentro do selosDoQuadro. */
+    {
+      const iF = cli.indexOf('function fighterHtml(');
+      const corpo = cli.slice(iF, cli.indexOf('\nfunction ', iF + 10));
+      const inline = (corpo.match(/selo\('(shiny|medalha_ouro|terreno)'/g) || []).length;
+      const usos = (corpo.match(/selosDoQuadro\(/g) || []).length;
+      ok('a fileira de selos e montada num lugar so (o selosDoQuadro)',
+         inline === 0 && usos === 2, inline + ' montagens inline, ' + usos + ' usos da funcao');
+      /* e os DOIS ramos produzem a MESMA fileira -- a metade de comportamento da mesma regra */
+      const m = cl(); m.playerShiny = true; m.playerSpecialty = true;
+      const soSelos = (h) => [...h.matchAll(/#s-([a-z_]+)/g)].map(x => x[1]).join('+');
+      const novo   = soSelos(S.fighterHtml(m, 'p', { visualNovo:true, hp:10, comTerreno:true }));
+      const antigo = soSelos(S.fighterHtml(m, 'p', { hp:10, comTerreno:true }));
+      ok('  e os dois ramos do quadro mostram os MESMOS selos', novo === antigo && novo.length > 0,
+         'novo=' + novo + '  antigo=' + antigo);
+    }
+
+    /* ⚠️ ESTAS DUAS LEEM O CSS, e e a unica forma de pega-las: a marcacao fica CERTA nos dois
+       casos e o defeito mora na folha de estilo -- a familia do sprite que nao encolheu na lista
+       "Pokemons desta rota" (16/09) e do amarelo transparente do botao de ordenar (24/09). */
+    {
+      const iSel = cli.indexOf('.hp-bar-selos{');
+      const regra = iSel < 0 ? '' : cli.slice(iSel, cli.indexOf('}', iSel));
+      /* ⚠️ COM `wrap` OS SELOS DESCEM PRA UMA SEGUNDA LINHA e o painel CRESCE no meio da batalha,
+         com o cenario atras dele. Foi por isso que a fileira antiga tinha `nowrap`, e o motivo
+         nao mudou de lugar junto com ela. */
+      ok('a fileira de selos NAO quebra linha (o painel cresceria no meio da luta)',
+         /flex-wrap:\s*nowrap/.test(regra) && /overflow:\s*hidden/.test(regra), regra.replace(/\s+/g,' ').slice(0,110));
+      /* ⚠️ E O SELO PEQUENO E EM `rem`: a linha do HP tem fonte diferente na cena (.56rem) e no
+         quadro antigo (.62rem) -- em `em` ele encolheria justamente na tela mais apertada. */
+      const iP = cli.indexOf('.selo-p{');
+      const regraP = iP < 0 ? '' : cli.slice(iP, cli.indexOf('}', iP));
+      ok('  e o selo pequeno e em rem, nao em em', /width:\s*\.?[0-9.]+rem/.test(regraP), regraP.trim());
+    }
+
+    /* ⚠️ QUANTOS SELOS CABEM: a linha corta o excedente (nowrap + overflow), e medido no
+       navegador a 320px cabem SETE. Esta trava nao mede pixel -- ela mede o que o MOTOR produz,
+       que e a outra metade da conta: em 90.399 quadros de 2.500 batalhas o maximo simultaneo foi
+       CINCO. Ela existe pra o dia em que um status novo empurrar isso pra 8 sem ninguem ver. */
+    {
+      const ids = Object.keys(S.SPECIES);
+      let semente = 12345; const rnd = () => (semente = (semente * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+      const time = (nv) => Array.from({length:6}, () => {
+        const p = S.createInstance(ids[Math.floor(rnd()*ids.length)], Math.max(5, nv + Math.floor(rnd()*9) - 4));
+        p.ataques = S.ataquesPadrao(p); if(rnd() < 0.08) p.shiny = true; return p; });
+      let maior = 0, quadros = 0, pior = '';
+      for(let b = 0; b < 200; b++){
+        const nv = 25 + Math.floor(rnd()*50);
+        for(const m of (S.simulateGymBattle(time(nv), time(nv)).matchups || [])){
+          m.playerBuffed = rnd() < 0.39; m.playerSpecialty = rnd() < 0.25;
+          const seq = S.sequenciaDoConfronto(m);
+          for(let passo = 1; passo <= seq.length; passo++){
+            const h = S.selosDoQuadro(m, 'p', { comTerreno:true, passo },
+              { shiny:m.playerShiny, buffed:m.playerBuffed, especialidade:m.playerSpecialty, saindo:false });
+            const ks = [...h.matchAll(/#s-([a-z_]+)/g)].map(x => x[1]);
+            quadros++; if(ks.length > maior){ maior = ks.length; pior = ks.join('+'); }
+          }
+        }
+      }
+      ok('  (a varredura viu quadros de verdade)', quadros > 3000, quadros + ' quadros');
+      ok('o motor nao produz mais selos do que cabem na linha (7)', maior <= 7,
+         'maximo ' + maior + ': ' + pior);
     }
   }
 
@@ -10518,10 +10703,18 @@ console.log('\n=== VIDA CHEIA NAO MORRE NUM GOLPE (17/09/2026) ===');
   const cli = require('fs').readFileSync(path.join(raiz, 'index.html'), 'utf8');
   ok('existe um verde padrao pro selo', cli.indexOf("const COR_TERRENO_PADRAO = '#7ec850'") >= 0,
      'sem a constante');
-  const iq = cli.indexOf("(op.comTerreno && buffed)");
-  const trecho = iq < 0 ? '' : cli.slice(iq, iq + 130);
+  /* ⚠️ MEDIDO E NAO LIDO: esta trava procurava o texto "(op.comTerreno && buffed)" no arquivo, e
+     ele virou "(op.comTerreno && o.buffed)" em 28/09 quando a fileira virou funcao -- ela caiu sem
+     defeito. Hoje ela CHAMA a funcao e olha a cor que sai. */
+  const vazio = { golpes: [] };
+  const comCorDada = S.selosDoQuadro(vazio, 'p', { comTerreno: true, corDoTerreno: '#123456' }, { buffed: true });
+  const semCorDada = S.selosDoQuadro(vazio, 'p', { comTerreno: true }, { buffed: true });
+  const semTerreno = S.selosDoQuadro(vazio, 'p', {}, { buffed: true });
+  ok('o quadro usa a cor do terreno quando ela vem',
+     comCorDada.indexOf('color:#123456') >= 0 && temSelo(comCorDada, 'terreno'), comCorDada.slice(0, 90));
   ok('e o quadro usa a cor do terreno, com ele de reserva',
-     trecho.indexOf('op.corDoTerreno || COR_TERRENO_PADRAO') >= 0, trecho.slice(0, 90));
+     semCorDada.indexOf('color:#7ec850') >= 0, semCorDada.slice(0, 90));
+  ok('  e sem comTerreno o selo do terreno nem sai', !temSelo(semTerreno, 'terreno'), semTerreno);
 
   /* e quem SABE o terreno manda a cor: as duas chamadas da tela da jornada */
   const comCor = (cli.match(/comTerreno: true, corDoTerreno: terrain \? terrainColor\(terrain\) : null/g) || []).length;

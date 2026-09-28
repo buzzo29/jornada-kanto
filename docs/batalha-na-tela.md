@@ -3104,6 +3104,162 @@ acontecendo"*. E não era o Mewtwo: era o **laço de revelação** que ele usa.
 - Conferido que o teste acusa com a declaração de volta pra baixo: **`parou em 0/10`**, que é
   exatamente o que o jogador via.
 
+## OS SELOS DE STATUS DESCERAM PRA LINHA DO NÚMERO DE HP (28/09/2026)
+
+Pedido assim: *"esses status, em vez de ficar aparecendo do lado direito do nome do pokémon, vamos
+colocar embaixo do quadro, embaixo da barra de HP, na mesma linha que hoje já aparece o número de
+quanto de HP o pokémon tá ... mais alinhado do lado esquerdo ... e também adicione o símbolozinho
+de quando o pokémon está dormindo, quando está confuso, quando ele teve algum golpe que foi
+desarmado. Você pode diminuir o tamanho do símbolo para não quebrar muito"*.
+
+**É a terceira casa deles em seis dias**, e a sequência explica o desenho: eles nasceram numa
+**linha própria embaixo** do nome, foram pra **o lado do nome** em 22/09 (*"deixe ao lado do nome,
+hoje está exibindo numa linha embaixo"*), e agora descem pra a **linha do número de HP**. O que
+mudou entre 22/09 e hoje foi a contagem: ao lado do nome eles disputavam espaço com ele, e a 320px
+o painel da cena tem **146px**.
+
+### ⚠️ A TRAVA QUE IMPORTA: OS SELOS SÃO IRMÃOS DO RÓTULO, NUNCA FILHOS
+
+As **cinco telas de revelação** atualizam a vida com `label.textContent = '300/400 HP'` — e
+`textContent` **APAGA tudo que estiver dentro do elemento**. Postos dentro do rótulo, os selos
+apareceriam no primeiro quadro e **sumiriam no primeiro golpe**.
+
+E o defeito seria mudo do pior jeito: a tela desenha certo, o print do primeiro quadro fica certo,
+e só quem olhasse a barra descendo veria. Nenhuma assertiva de *"o selo está no HTML"* pega isso —
+a que pega exige que o selo esteja **fora** do rótulo, e há uma segunda cobrando que a animação
+realmente use `textContent` (senão a primeira vira uma regra sem motivo, e alguém a "simplifica").
+
+A marcação é `.hp-bar-rodape` > (`.hp-bar-selos` | `.hp-bar-label`), e o rótulo continua sendo
+o **mesmo elemento com o mesmo id**: a animação não mudou uma linha.
+
+### ⚠️ E O `renderHpBar` SEM SELOS SAI BYTE A BYTE COMO ANTES
+
+Ele tem **9 chamadas** e só **duas** (as do `fighterHtml`) passam selos. As outras sete — o log
+de batalha, a Elite, o Boss, o online, a Pescaria, o card do time — não podem ganhar um elemento a
+mais por causa disto, e há trava comparando a saída sem selos com a string esperada, caractere por
+caractere.
+
+### OS TRÊS SELOS NOVOS, E UM QUARTO QUE VEIO DE GRAÇA
+
+O pedido nomeia três: **dormindo**, **confuso** e **golpe desarmado**. Entrou um quarto:
+
+- **⚠️ O CONGELAMENTO, que é o mais importante dos quatro e ninguém pediu** — ele faz o pokémon
+  perder a vez e **não tinha selo nenhum**: só a arte sobre o sprite, que o caminho antigo (a
+  Torre, a Pescaria, o desafio por código) **nem desenha**.
+
+Ele veio de graça porque os cinco status passaram a sair da **mesma máquina que a arte sobre o
+sprite** (`statusVisuaisDaSequencia`). Eram **duas leituras do mesmo estado**, e elas não
+concordavam:
+
+| | arte sobre o sprite | selo, antes | selo, agora |
+|---|---|---|---|
+| queimadura, veneno, paralisia | sim | sim | sim |
+| **sono, confusão** | sim | **não** | **sim** |
+| **congelamento** | sim | **não** | **sim** |
+
+**⚠️ E ISSO NÃO É DUPLICAÇÃO NOVA — é o fim de uma inconsistência.** Queimadura, veneno e paralisia
+já apareciam nos dois lugares desde 22/09; os outros três eram a exceção.
+
+**⚠️ E A MÁQUINA ESCOLHIDA FOI A DA SEQUÊNCIA porque ela sabe MAIS:** ela trata o herdado pelo
+campo do matchup (como a antiga fazia), o `acordou`/`degelou`/`saiuConfusao` (que a antiga
+**não** tratava) e o passo de cada um. **A fúria ficou de fora dela, e é decisão:** ela ACUMULA por
+batalha, então um pokémon atravessa três confrontos furioso com a marca do diário só no primeiro —
+ela sai do campo, e é por isso que o número sai junto a partir da segunda vez.
+
+### ⚠️ O CADEADO É O ÚNICO SELO CUJO DONO É O LADO OPOSTO DA MARCA
+
+O `q` do `disable` é de **QUEM ANULOU** — a frase do log é *"X teve o ataque Y anulado por Z"*,
+e o `q` é o **Z**. Lido como os outros cinco, o cadeado apareceria no pokémon **errado**, e a tela
+continuaria perfeitamente plausível.
+
+(É a mesma inversão que a **Dança da Pluma** já usa uma linha acima, e o contrário exato da
+armadilha que a conta do cadáver pagou em 25/09 com o `q` da queimadura.)
+
+E ele **só aparece a partir do passo da anulação**: desde 25/09 o Disable é golpe da **troca** e
+não mais abertura, então ele acontece no MEIO — a mesma regra do 🔥, que já custou um relato
+(*"o emoji tá aparecendo logo quando o pokémon entra na luta"*).
+
+### ⚠️ O TAMANHO SAIU DE UMA MEDIÇÃO, NÃO DO OLHO
+
+O pedido diz *"pode diminuir o tamanho do símbolo pra não quebrar muito"*, e a pergunta real é
+**quantos selos aparecem juntos**. Medido em **90.399 quadros de 2.500 batalhas**:
+
+| selos simultâneos | dos quadros |
+|---|---|
+| 0 | 35,7% |
+| 1 | 44,5% |
+| 2 | 17,1% |
+| 3 | 2,5% |
+| 4 | 0,26% |
+| **5 — o máximo** | raríssimo |
+
+**mediana 1 · p90 2 · p99 3 · p99,9 4 · máximo 5** (terreno + medalha + fúria + sono + paralisia).
+
+**⚠️ E OS 13 SELOS APARECEM TODOS NA AMOSTRA** — inclusive o **cadeado (1,23% dos quadros)** e o
+**gelo (0,106%)** —, então o 5 não é falta de exercício: é o teto de verdade.
+
+**Medido no navegador a 320px**, com o selo em `.82rem` (13,1px) e gap 2:
+
+| | selos | precisa | cabe | cortou |
+|---|---|---|---|---|
+| o caso comum | 2 | 28px | sim | não |
+| **o máximo medido** | **5** | **81px** | **sim** | **não** |
+| a margem | 6 | 96px | sim | não |
+| o teto teórico | 13 | 206px | **não** | sim |
+
+**Cabem SETE.** O corte começa em 8, e o motor produz no máximo 5.
+
+- **⚠️ O GAP FOI DE 3 PRA 2 POR ESSA CONTA:** com 3 os cinco davam **80,5px** num espaço de 80 —
+  o pior caso real empatava no limite exato.
+- **⚠️ E O SELO PEQUENO É EM `rem`, NÃO EM `em` COMO OS OUTROS DOIS.** A linha do HP tem fonte
+  diferente em cada quadro (.56rem na cena, .62rem no antigo) — em `em` ele encolheria justamente
+  na tela mais apertada. Há trava lendo o CSS.
+- **⚠️ E `nowrap` + `overflow:hidden`, NUNCA `flex-wrap`:** com wrap, uma luta com muitos
+  status empurra os selos pra uma segunda linha e o **painel cresce no meio da batalha**, com o
+  cenário atrás dele. Medido: a altura do `.hp-bar-wrap` é **25,1px nos quatro casos**, de 2 a 13
+  selos. É a mesma razão que a fileira ao lado do nome já registrava.
+- **⚠️ E AS DUAS TRAVAS DE CSS LEEM A FOLHA DE ESTILO**, porque nos dois casos a **marcação fica
+  certa** e o defeito mora no estilo — a família do sprite que não encolheu na lista "Pokémons
+  desta rota" (16/09) e do amarelo transparente do botão de ordenar (24/09).
+
+### ⚠️ E A ESPECIFICIDADE MORDEU, COMO SEMPRE
+
+`.battle-scene .battle-mon-panel .hp-bar-label` tem **três classes** e vence o
+`.hp-bar-rodape .hp-bar-label` (duas) — então o `margin-top:2px` dela voltava e **somava** com o
+do rodapé. Precisou de uma regra de três classes do lado do rodapé.
+
+### A FILEIRA VIROU UMA FUNÇÃO (`selosDoQuadro`)
+
+Ela estava escrita **duas vezes** — uma na cena nova e outra inline no caminho antigo — e as duas
+ficaram idênticas por sorte. Hoje os dois ramos leem a mesma função.
+
+**⚠️ E A TRAVA DISSO PRECISOU LER O CÓDIGO, porque a de comportamento não pega:** uma cópia
+idêntica produz o MESMO html, então comparar os dois ramos fica verde. Foi a **conferência de
+acusação** que cobrou — religando a duplicação, nenhuma trava caiu (**MUDO**). A regra que ficou é
+que os três selos permanentes só podem ser montados dentro do `selosDoQuadro`.
+
+**A ORDEM DA FILEIRA É DELIBERADA**, e ela é do mais **permanente** pro mais passageiro: primeiro o
+que o pokémon **É** (shiny, terreno, especialidade — verdade o confronto inteiro), depois o que
+está **acontecendo** com ele (as duas danças, a fúria, os cinco status), e por último o cadeado.
+Numa linha que corta o excedente, o que precisa sobreviver ao corte é o começo.
+
+### E O NOME PAROU DE CEDER ESPAÇO
+
+Com os selos fora do `.battle-mon-head`, o nome passou a ter a largura inteira menos o `Lv.`.
+A regra antiga (*"quem cede espaço é o nome"*) deixou de ser necessária — medido, **zero nomes
+truncados** nos cinco casos.
+
+**NO MOTOR, NADA:** `MOTOR a9075d0e4899 / DIARIO 9a0ae4840b92`, idêntico em 900 batalhas semeadas,
+com o instrumento confirmado sensível. É apresentação inteira.
+
+`tools/test-especiais.js` tranca 18 pontas, e as que importam são a dos **selos fora do rótulo**
+(com a que prova que a animação usa `textContent`), a do **ramo sem selos byte a byte**, a do
+**cadeado no lado certo e no passo certo**, a de que **todo status com arte sobre o sprite tem selo
+na linha do HP**, as duas de **CSS**, e a da **fonte única**. Mais uma varredura de 200 batalhas
+cobrando que o motor não produza mais selos do que cabem na linha.
+**Conferido: os 9 defeitos religados acusam** (2 a 6 falhas cada).
+
+
 ## OS SELOS DO JOGO (17/09/2026) — o emoji virou desenho nosso
 
 Pedido assim: *"tente trocar tudo quanto é emoji pronto, por desenhos próprios do nosso jogo, tente
