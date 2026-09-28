@@ -5909,7 +5909,67 @@ níveis valem +4,25 e +10 valem +8,19).
   motivo da Torre: uma semana que ficou pra fora se recupera sozinha em vez de esperar um relato.
 - **A semana VAZIA fecha e fica MARCADA**, senão o cron voltaria nela de hora em hora pra sempre.
 
-### ⚠️ A CÓPIA INICIAL, e ela roda UMA VEZ SÓ
+### ⚠️ A CÓPIA INICIAL FOI REMOVIDA (28/09/2026) — ela rodava UMA VEZ POR SEMANA
+
+Relatado na primeira segunda-feira depois de o pódio existir: *"já se encerrou a semana nas ilhas
+laranjas e não apareceu aquele modal no home ... e também no ranking da semana dentro de cada
+ilha, continua os valores da semana passada"*.
+
+⚠️ **Não eram os da semana passada: eram os DE SEMPRE.** O log do cron daquela manhã diz tudo:
+
+    Ranking semanal fishingRanking/2026-09-28: 10 copiado(s) do geral.
+    Ranking semanal rescueRanking/2026-09-28:  18 copiado(s) do geral.
+    Ranking semanal raceRanking/2026-09-28:    18 copiado(s) do geral.
+
+A cópia nasceu como **migração de uma vez**, e a descrição abaixo (que fica como história) diz que
+ela "roda uma vez só". **Ela não rodava.** A marca dela (`copiado`) mora no documento **DA
+SEMANA** — então ela rodava **uma vez POR SEMANA**, e toda segunda despejava o quadro de todos os
+tempos dentro da semana recém-nascida.
+
+⚠️ **E O ESTRAGO NÃO ERA SÓ VISUAL.** Conferido no Firestore: a semana **2026-09-21 também tem
+`copiado: true`**. Ou seja o **pódio dela** — e os **prêmios pagos na segunda** — foram pros
+líderes **de sempre**, e não pra quem se destacou na semana. Um ranking semanal pré-preenchido com
+o de sempre não mede a semana; ele mede o de sempre.
+
+**A correção foi REMOVER, e não consertar a marca:** a migração já aconteceu, e uma cópia "uma vez
+na vida" é uma função que nunca mais roda — do tipo que fica anos no arquivo sem ninguém saber que
+morreu. **Semana nova deve nascer vazia**: é isso que "ranking semanal" quer dizer, e a tela já
+tem a frase pra esse estado (*"ninguém pontuou NESTA SEMANA ainda"*).
+
+**Os 46 documentos que ela copiou naquela manhã foram apagados** da semana 2026-09-28 — 10, 18 e
+18, exatamente o que o log diz que ela copiou, ou seja **ninguém tinha jogado ainda** às 04h26 de
+segunda. ⚠️ **Com captura completa antes** (`.patch-bak/backup-semana-2026-09-28.json`): este
+projeto não tem PITR nem backup, e a janela de recuperação é de **uma hora**.
+
+⚠️ **E a ordem importou:** os jogadores foram apagados mas a marca `copiado: true` FICOU, de
+propósito — ela é o que impediu o cron de re-copiar na volta seguinte, na janela entre a limpeza e
+o deploy.
+
+### ⚠️ E O MODAL DO PÓDIO ESTAVA NA TELA ERRADA
+
+O mesmo relato trouxe a segunda metade: *"não apareceu aquele modal no home"*. Ele nasceu na
+**tela-hub das Ilhas** — eu li o *"quando os usuários entrarem ... ver essa tela"* do pedido
+original como sendo a delas.
+
+**Conferido no Firestore que o mecanismo funcionava:** as quatro semanas de `2026-09-21` têm
+`awarded_*` **e** `resumo_*` com nomes e valores. Era só o lugar.
+
+⚠️ **E O GATILHO DAS ILHAS SAIU JUNTO**, em vez de ficar de reserva: passa-se pela home **antes**
+de chegar nelas, sempre — então ele nunca dispararia, e dois gatilhos pro mesmo modal (com uma
+marca só) enganam quem for mexer depois.
+
+⚠️ **TRÊS TRAVAS FORAM VIRADAS, nenhuma afrouxada:**
+
+| a trava cobrava | hoje cobra |
+|---|---|
+| que o cron **CHAMASSE** a cópia, e antes do fechamento | que ele **não** chame |
+| o modal na tela das **Ilhas** | a **home**, nos dois pontos (o gatilho e a pilha de modais) **e** que não esteja mais nas Ilhas |
+| que a **Arena** ficasse FORA da cópia | que **ninguém** seja pré-preenchido, porque a cópia não existe |
+
+E uma nova: **o recordista de sempre não aparece na semana nova** — ela roda o cron inteiro e
+confere a subcoleção, que é o que o relato pegou. **4 de 4 defeitos religados acusam.**
+
+### A CÓPIA INICIAL — como ela era (história)
 
 Foi o pedido (*"pode copiar os dois igual, porque como começou antes de ontem, só teve essa
 semana"*): os três jogos nasceram há poucos dias, então **todo recorde de sempre é também desta
