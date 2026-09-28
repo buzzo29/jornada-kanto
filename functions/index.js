@@ -6737,8 +6737,14 @@ const RECRUTA_INATIVO_MS = 7 * 24 * 60 * 60 * 1000;   // "não loga há mais de 
      - CANDIDATOS: quantos inativos a consulta traz por volta;
      - TENTATIVAS: quantos sorteados ele chega a EXAMINAR (cada exame lê os saves da conta).
    Medido no pior caso: ~1 + 10 + 3×(1 + saves) ≈ 20 leituras por volta, ~4.000 por dia. */
-const RECRUTA_CANDIDATOS = 10;
-const RECRUTA_TENTATIVAS = 3;
+/* ⚠️ OS DOIS SUBIRAM quando a busca virou VARREDURA: agora a pagina e o passo do cursor, entao
+   ela decide em quantas voltas a colecao inteira e coberta -- com 30 e ~239 contas, sao 8 voltas
+   (~40 minutos). E as tentativas sao quantos INATIVOS de cada pagina ele chega a examinar; com a
+   densidade medida (~2 inativos por 10 contas), 10 cobre a pagina toda com folga.
+   Custo por volta: 1 (cursor) + 1 (agenda) + 30 (pagina) + ate 10x(1+2+1) = ~72 leituras e 1
+   escrita -- ~14.000 leituras/dia nas 200 voltas, contra a cota gratuita de 50.000. */
+const RECRUTA_CANDIDATOS = 30;
+const RECRUTA_TENTATIVAS = 10;
 
 /* ============================================================================
    ⚠️ A JANELA SORTEADA É PELO **ID**, e não pelo `lastSeenAt` -- e essa foi a correção de
@@ -6765,27 +6771,50 @@ const RECRUTA_TENTATIVAS = 3;
    ⚠️ E QUEM NUNCA TEVE `lastSeenAt` CONTINUA DE FORA, agora explicitamente: sem o campo ele não é
    inativo nem ativo, e conta que nunca abriu o jogo também nunca teve time campeão.
    ============================================================================ */
-const RECRUTA_ALFABETO = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-function idSorteado(){
-  let s = '';
-  for(let i = 0; i < 28; i++) s += RECRUTA_ALFABETO[Math.floor(Math.random() * RECRUTA_ALFABETO.length)];
-  return s;
-}
+/* ============================================================================
+   ⚠️ E A SEGUNDA CORRECAO DO MESMO DIA: A VARREDURA VIROU **SEQUENCIAL, COM CURSOR** -- e ela
+   substituiu o sorteio por id, que era a PRIMEIRA correcao.
+
+   O sorteio por id funcionava (a trava mede: 30 de 30 alcancados em 60 voltas). O problema e que
+   ele e uma APOSTA, e o poco e fino. MEDIDO em producao, com os contadores que esta funcao passou
+   a imprimir: numa janela de 10 contas vieram **2 inativos**, e os DOIS sem time de 8 insignias.
+
+   A conta que decide: sao ~239 contas, ~110 inativas, e so uma fracao delas tem time campeao. Pra
+   achar um punhado de elegiveis numa colecao desse tamanho, uma janela sorteada de 10 erra na
+   maioria das voltas -- e erra PRA SEMPRE, porque nada garante que ela um dia caia neles.
+
+   ⚠️ A VARREDURA GARANTE COBERTURA: ela anda pela colecao em ordem de id, guarda ONDE PAROU, e a
+   volta seguinte continua dali. Em ~8 voltas (uma pagina de 30) ela passa pelas 239 -- ou seja
+   **todo elegivel e visto a cada ~40 minutos**, em vez de depender de sorte.
+   ⚠️ E O "ALEATORIO" DO PEDIDO CONTINUA DE PE: a ordem e por UID, que e aleatoria por construcao,
+   e o ponto de partida gira a cada volta. O que muda e que ela nao PULA ninguem.
+
+   ⚠️ O CURSOR CUSTA 1 LEITURA E 1 ESCRITA por volta, e e o que paga a cobertura. Ele mora num
+   documento proprio: o da agenda da Liga e escrito pelo cliente (ver o firestore.rules), e um
+   campo nosso ali seria apagado por qualquer reescrita da agenda.
+   ============================================================================ */
+const RECRUTA_CURSOR = 'recrutadorClassica';
 async function sortearInativoComTimeCampeao(ciclo){
   const limite = Date.now() - RECRUTA_INATIVO_MS;
   const col = db.collection('users');
-  /* ⚠️ O `FieldPath.documentId()`, e nao a string '__name__': e a forma que o painel de
-     treinadores ja usa em producao pra paginar por id, e o fake-firestore so conhece essa.
-     O cursor e o id CRU -- e assim que o `adminListTrainers` pagina, e funciona. */
   const PORID = admin.firestore.FieldPath.documentId();
-  let cands = await col.orderBy(PORID).startAfter(idSorteado()).limit(RECRUTA_CANDIDATOS).get();
-  /* a janela pode cair no fim da coleção e voltar curta -- aí completa do começo */
-  if(cands.size < RECRUTA_CANDIDATOS){
-    const doComeco = await col.orderBy(PORID).limit(RECRUTA_CANDIDATOS).get();
-    const vistosIds = new Set(cands.docs.map(d => d.id));
-    cands = { docs: cands.docs.concat(doComeco.docs.filter(d => !vistosIds.has(d.id))), empty: false };
+  const cursorRef = db.collection('leagues').doc(RECRUTA_CURSOR);
+  const cursorSnap = await cursorRef.get().catch(() => null);
+  const desde = (cursorSnap && cursorSnap.exists) ? (cursorSnap.data() || {}).ultimoId : null;
+
+  let q = col.orderBy(PORID).limit(RECRUTA_CANDIDATOS);
+  if(desde) q = q.startAfter(desde);
+  let cands = await q.get();
+  /* ⚠️ CHEGOU AO FIM: volta pro comeco. Sem isto ela varreria a colecao UMA vez e nunca mais --
+     e o sintoma seria o mesmo de antes (ele para de achar), so que uma volta inteira depois. */
+  if(!cands.docs.length){
+    cands = await col.orderBy(PORID).limit(RECRUTA_CANDIDATOS).get();
   }
   if(!cands.docs.length) return null;
+  /* o cursor avanca ANTES de examinar: se a volta estourar no meio, a proxima nao repete a mesma
+     pagina pra sempre -- perder uma pagina uma vez e melhor que travar nela */
+  await cursorRef.set({ ultimoId: cands.docs[cands.docs.length - 1].id, em: Date.now() },
+    { merge: true }).catch(() => {});
 
   /* ⚠️ O FILTRO DE INATIVIDADE ACONTECE AQUI, sobre a página que já foi lida -- ver o porquê no
      comentário acima. E ele é a MESMA regra de antes: "não loga há mais de uma semana". */
@@ -6795,23 +6824,33 @@ async function sortearInativoComTimeCampeao(ciclo){
   }).map(d => d.id);
   if(!uids.length) return null;
 
-  /* embaralha: sem isto ele tentaria sempre os primeiros da janela */
+  /* ⚠️ O EMBARALHAMENTO FICA, e agora ele serve a outra coisa: a pagina e varrida em ordem de id,
+     e sem ele as TENTATIVAS cairiam sempre nos primeiros da pagina -- os do fim so seriam vistos
+     na volta em que a pagina comecasse neles. Embaralhado, a tentativa passeia pela pagina. */
   for(let i = uids.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1));
     [uids[i], uids[j]] = [uids[j], uids[i]]; }
 
+  /* ⚠️ OS CONTADORES SAO O DIAGNOSTICO, e eles nasceram de uma investigacao que nao deu em nada:
+     o log dizia so "nenhum inativo elegivel", e pra descobrir POR QUE eu tentei medir a producao
+     por fora -- duas vezes, e as duas o instrumento estava quebrado (o operador do MCP nao
+     filtrava, e depois ele nao aceitava caminho de subcolecao). A funcao SABE a resposta; ela e
+     que nao estava contando. */
+  const conta = { pagina: cands.docs.length, inativos: uids.length,
+                  jaInscrito: 0, outraLiga: 0, semCampeao: 0, examinados: 0 };
   let vistos = 0;
   for(const uid of uids){
     if(vistos >= RECRUTA_TENTATIVAS) break;
     /* ⚠️ A PERGUNTA BARATA VEM ANTES DA CARA: "já está neste ciclo?" é UMA leitura, e ler os saves
        da conta é uma coleção inteira. É a forma das guardas do Remoinho e da prioridade. */
     const ja = await registrantDocRef(CLASSIC_LEAGUE_TYPE, ciclo.id, uid).get();
-    if(ja.exists) continue;
-    vistos++;
-    if(await adminJaInscritoEmAlgumaLiga(uid, true)) continue;
+    if(ja.exists){ conta.jaInscrito++; continue; }
+    vistos++; conta.examinados++;
+    if(await adminJaInscritoEmAlgumaLiga(uid, true)){ conta.outraLiga++; continue; }
     const slot = await melhorSaveCampeaoDaConta(uid);
-    if(slot) return { uid, slot };
+    if(slot) return { uid, slot, conta };
+    conta.semCampeao++;
   }
-  return null;
+  return { conta };
 }
 
 /* ⚠️ "O TIME DE MELHOR MÉDIA DE LEVEL", que foi o pedido ao pé da letra -- e a média é a MESMA
@@ -6841,18 +6880,23 @@ async function recrutarParaAClassica(){
     return { ok: false, motivo: 'sem ciclo com inscrições abertas' };
   }
   const achado = await sortearInativoComTimeCampeao(ciclo);
-  /* ⚠️ O MOTIVO VAI PRO LOG. Sem isto a volta que não acha ninguém é uma LINHA VAZIA no console,
-     e foi exatamente o que atrasou o diagnóstico do sorteio: as três voltas que falharam não
-     disseram nada, e não dava pra separar "não há ciclo" de "não há candidato". */
-  if(!achado){
-    logger.info('Recrutador: nenhum inativo elegível nesta volta (ciclo ' + ciclo.id + ')');
+  /* ⚠️ O MOTIVO VAI PRO LOG, COM OS NUMEROS. Sem isto a volta que não acha ninguém é uma LINHA
+     VAZIA no console -- e foi exatamente o que atrasou o diagnóstico do sorteio. E sem os números
+     ela diz que falhou mas não ONDE: a página veio vazia? todos ativos? todos já inscritos?
+     nenhum com 8 insígnias? Cada um desses pede uma correção diferente. */
+  const placar = (c) => c ? ('pagina ' + c.pagina + ', inativos ' + c.inativos
+    + ', ja inscritos ' + c.jaInscrito + ', examinados ' + c.examinados
+    + ', em outra liga ' + c.outraLiga + ', sem time de 8 insignias ' + c.semCampeao) : '(sem conta)';
+  if(!achado || !achado.uid){
+    logger.info('Recrutador: nenhum elegível nesta volta (ciclo ' + ciclo.id + ') -- '
+      + placar(achado && achado.conta));
     return { ok: false, motivo: 'nenhum inativo elegível nesta volta' };
   }
   try{
     const montado = await montarInscritoDoSave(achado.uid, achado.slot);
     await gravarInscritoNaClassica(achado.uid, achado.slot, ciclo, montado);
     logger.info('Recrutado pra Clássica: ' + montado.nome + ' (' + achado.uid + ' / save '
-      + achado.slot + ') no ciclo ' + ciclo.id);
+      + achado.slot + ') no ciclo ' + ciclo.id + ' -- ' + placar(achado.conta));
     return { ok: true, uid: achado.uid, slot: achado.slot, nome: montado.nome, cycleId: ciclo.id };
   } catch(e){
     /* ⚠️ ELE ENGOLE E SEGUE: este é um laço de fundo, e um inativo com save estranho não pode

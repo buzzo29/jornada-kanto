@@ -2402,7 +2402,46 @@ recusa) nem quem está no ciclo aberto de OUTRA liga.
 
 ⚠️ **Há trava lendo o código pra isso:** o corpo do recrutador não pode ter um `.set(` próprio.
 
-### ⚠️ O SORTEIO É PELO **ID**, e a primeira versão nasceu quebrada
+### ⚠️ A BUSCA É UMA VARREDURA COM CURSOR — e ela é a SEGUNDA correção do mesmo dia
+
+O sorteio por id (a primeira correção, logo abaixo) **funcionava** — a trava mede 30 de 30
+alcançados em 60 voltas. O problema é que ele é uma **aposta**, e o poço é **fino**.
+
+**Quem respondeu foi o log, depois de ele passar a contar:**
+
+    pagina 10, inativos 2, ja inscritos 0, examinados 2, em outra liga 0, sem time de 8 insignias 2
+
+Numa janela de 10 contas vieram **2 inativos**, e os **dois sem time de 8 insígnias**. Com ~239
+contas, ~110 inativas e só um punhado com time campeão, uma janela sorteada de 10 erra na maioria
+das voltas — **e pode errar pra sempre**: nada garante que ela um dia caia nos elegíveis.
+
+⚠️ **A VARREDURA GARANTE COBERTURA:** ela anda pela coleção em ordem de id, **guarda onde parou**
+(`leagues/recrutadorClassica`), e a volta seguinte continua dali. Com a página em 30 e ~239
+contas, são **8 voltas** pra passar por todas — ou seja **todo elegível é visto a cada ~40
+minutos**, em vez de depender de sorte.
+
+⚠️ **E O "ALEATÓRIO" DO PEDIDO CONTINUA DE PÉ:** a ordem é por UID, que é aleatória por construção,
+e o ponto de partida gira a cada volta. O que muda é que ela **não pula ninguém**.
+
+- **O cursor mora num documento próprio**, e não na agenda da Liga: aquela é escrita pelo CLIENTE
+  (ver o `firestore.rules`), e um campo nosso ali seria apagado por qualquer reescrita dela.
+- **Ele avança ANTES de examinar a página:** se a volta estourar no meio, a próxima não repete a
+  mesma página pra sempre — perder uma página uma vez é melhor que travar nela.
+- **⚠️ E CHEGANDO AO FIM ELE VOLTA PRO COMEÇO.** Sem essa volta ele varreria a coleção UMA vez e
+  nunca mais — e o sintoma seria **idêntico** ao defeito original (*"ele para de achar"*), só que
+  uma varredura inteira depois, o que é muito pior de diagnosticar. Há trava.
+- **O embaralhamento ficou, e serve a outra coisa agora:** sem ele as TENTATIVAS cairiam sempre
+  nos primeiros da página.
+
+**O custo por volta:** 1 (cursor) + 1 (agenda) + 30 (página) + até 10×(1+2+1) ≈ **72 leituras e 1
+escrita** → ~14.000 leituras/dia nas 200 voltas, contra a cota gratuita de 50.000.
+
+⚠️ **E A TRAVA PRECISOU DE UM PAINEL MAIOR QUE A PÁGINA, de novo.** Quando o `RECRUTA_CANDIDATOS`
+subiu de 10 pra 30, o painel de 30 fez a assertiva *"passou da primeira página"* comparar 30 com
+30 — ela deixou de distinguir "varreu tudo" de "leu a primeira página". Hoje o painel tem **80**, e
+dá **60 de 80 em 60 voltas**: um por volta, sem perder nenhuma.
+
+### ⚠️ O SORTEIO POR **ID**, que foi a primeira correção
 
 Ela sorteava o ponto de partida em `[0, limite]` e dava `startAfter` nele, com
 `orderBy('lastSeenAt')`. **Foi relatado em minutos**: *"já subiu faz uns minutos e ainda só tem 4

@@ -905,10 +905,15 @@ console.log('\n=== O PAINEL INSCREVE NA TRAINERS LEAGUE (27/09/2026) ===');
           for(let k = 0; k < 28; k++) s += ALFA[Math.floor(dado() * ALFA.length)]; return s; };
         /* 30 inativos, com o lastSeenAt numa faixa ESTREITA como a da producao (28 dias) */
         const base = ag - 40 * DIA2, faixa = 28 * DIA2;
+        /* ⚠️ O PAINEL TEM QUE SER MAIOR QUE A PAGINA, senao a trava nao distingue "varreu
+           tudo" de "leu a primeira pagina" -- foi o que aconteceu quando o RECRUTA_CANDIDATOS
+           subiu de 10 pra 30 e o painel tinha 30: a assertiva `> pagina` passou a comparar 30
+           com 30. E a mesma licao do painel de tres contas, uma correcao antes. */
         const daDist = new Set();
-        for(let i = 0; i < 30; i++){
+        const N_DIST = 80;
+        for(let i = 0; i < N_DIST; i++){
           const u = uidFalso(); daDist.add(u);
-          await conta9(u, 'Dist' + i, base + Math.floor((i / 30) * faixa),
+          await conta9(u, 'Dist' + i, base + Math.floor((i / N_DIST) * faixa),
             { '0': { team: time9(50 + i), badgeCount: 8 } });
         }
 
@@ -924,10 +929,37 @@ console.log('\n=== O PAINEL INSCREVE NA TRAINERS LEAGUE (27/09/2026) ===');
            ele pararia nos RECRUTA_CANDIDATOS primeiros (10) -- e e essa a diferenca que a trava
            mede. O limiar e 20 e nao 30 porque o sorteio e sorteio: uma cauda de azar e legitima. */
         ok('  ele alcanca a colecao INTEIRA, nao so a primeira pagina',
-           pegos.size >= 20, pegos.size + ' de 30 alcancados em 60 voltas'
+           pegos.size >= 40, pegos.size + ' de ' + N_DIST + ' alcancados em 60 voltas'
            + '  (com o sorteio velho o teto era ' + F2._recrutador.RECRUTA_CANDIDATOS + ')');
         ok('    e passou de longe da primeira pagina',
            pegos.size > F2._recrutador.RECRUTA_CANDIDATOS, String(pegos.size));
+
+        /* ⚠️ O CURSOR ANDA -- e sem isto a varredura leria a MESMA pagina pra sempre, que e
+           exatamente o defeito que ela veio consertar, so que com outra cara. */
+        const cur1 = await db2.collection('leagues').doc('recrutadorClassica').get();
+        const onde1 = cur1.exists ? cur1.data().ultimoId : null;
+        await R.recrutarParaAClassica();
+        const cur2 = await db2.collection('leagues').doc('recrutadorClassica').get();
+        ok('  o cursor ANDA entre as voltas', !!onde1 && cur2.exists && cur2.data().ultimoId !== onde1,
+           onde1 + ' -> ' + (cur2.exists ? cur2.data().ultimoId : '(sem cursor)'));
+
+        /* ⚠️ E CHEGANDO AO FIM ELE VOLTA PRO COMECO. Sem esta volta ele varreria a colecao UMA vez
+           e nunca mais -- e o sintoma seria IDENTICO ao defeito original ("ele para de achar"),
+           so que uma varredura inteira depois, o que e muito pior de diagnosticar. */
+        {
+          const todos = await db2.collection('users')
+            .orderBy(fake2.FieldPath.documentId()).get();
+          const ultimo = todos.docs[todos.docs.length - 1].id;
+          await db2.collection('leagues').doc('recrutadorClassica')
+            .set({ ultimoId: ultimo, em: Date.now() }, { merge: true });
+          /* zera as inscricoes pra haver o que achar depois da volta */
+          const insc = await db2.collection('leagueCycles').doc('classic__rec2')
+            .collection('registrants').get();
+          for(const d of insc.docs) await d.ref.delete();
+          const r = await R.recrutarParaAClassica();
+          ok('  e no FIM da colecao ele volta pro comeco', r.ok === true,
+             JSON.stringify(r).slice(0, 90));
+        }
       }
 
       /* ⚠️ E O SORTEIO E PELO ID, que e o unico campo com distribuicao uniforme aqui: o UID do
