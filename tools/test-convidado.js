@@ -109,7 +109,7 @@ const PROTEGIDAS = ['acceptOnlineMatch','challengeFriend','challengeLobbyPlayer'
    21/09 e a travessia em 23/09), entao ele pode estar no podio -- e ela so LE. */
 const LIVRES = ['activateBoughtShinyBonus','activateEliteShinyBonus','activateMewtwoLoan','activateShinyBonus',
 'getIslandsWeeklyPodium',
-'adminAddLeagueRegistration','adminAddTrainersLeagueRegistration','adminLeagueQueue','adminListTrainers',
+'adminAddLeagueRegistration','adminAddTrainersLeagueRegistration','adminDeleteTrainer','adminLeagueQueue','adminListTrainers',
 'adminRemoveLeagueRegistration','buyItem',
 'cancelFriendChallenge','checkMewtwoLoanUnlock','checkNeighborhoodGymDefenseForSlot','claimAchievementCoins',
 'claimEliteShinyBonus','claimJourneyCoins','consumeEquipped','deleteNotification','deleteNotifications',

@@ -19,6 +19,7 @@ const Module = require('module');
 const fake = require('./fake-firestore');
 
 const db = fake.makeDb();
+const authApagados = [];   // ver o duble do auth, logo abaixo
 const stubs = {
   'firebase-functions/v2/scheduler': { onSchedule: (a, b)=> (typeof a === 'function' ? a : b) },
   'firebase-functions/v2/https': {
@@ -28,7 +29,12 @@ const stubs = {
   'firebase-functions/logger': { error(){}, info(){}, warn(){}, log(){} },
   'firebase-admin': {
     initializeApp(){},
-    firestore: Object.assign(()=>db, { FieldValue: fake.FieldValue, FieldPath: fake.FieldPath })
+    firestore: Object.assign(()=>db, { FieldValue: fake.FieldValue, FieldPath: fake.FieldPath }),
+    /* ⚠️ O DUBLE DO AUTH anota em vez de apagar: a exclusao de conta apaga o LOGIN junto, e sem
+       isto ela morreria com "admin.auth is not a function" num ponto que nao tem nada a ver com o
+       que esta sendo testado. O `authApagados` e o que deixa a trava conferir que ele foi mesmo
+       chamado -- olhar so o retorno da funcao provaria que ela DIZ ter apagado, nao que apagou. */
+    auth: () => ({ async deleteUser(uid){ authApagados.push(uid); } })
   }
 };
 const loadOriginal = Module._load;
@@ -403,6 +409,193 @@ console.log('\n=== A FILA DA LIGA NO PAINEL ===');
   ok('o resumo do save manda o `aposentado`', /aposentado: !!\(s && s\.aposentado\)/.test(res),
      'o painel ofereceria a inscrição de um time aposentado');
 }
+
+
+  console.log('\nAPAGAR UMA CONTA INTEIRA (29/09/2026)');
+  {
+    /* ⚠️ A CONTA E ESPALHADA DE PROPOSITO, em todos os lugares que o mapa achou: e um painel que
+       so testasse `users/{uid}` daria verde com a conta viva em nove outros lugares -- e o sintoma
+       seria ela reaparecer num ranking meses depois, que e mudo.
+       ⚠️ E A TRAVA QUE IMPORTA NAO E UMA LISTA DE LUGARES: e o STORE INTEIRO varrido no fim, sem
+       achar o uid em canto nenhum. Uma lista so prova o que EU lembrei; a varredura prova o resto. */
+    const ALVO = 'uidAlvo', OUTRO = 'uidAmigo', ADM = 'uidAdmin';
+    const montar = async () => {
+      await db.collection('users').doc(ADM).set({ admin: true, trainerName: 'O Chefe' });
+      await db.collection('users').doc(ALVO).set({ trainerName: 'Fulano', leagueWinsTotal: 3 });
+      await db.collection('users').doc(ALVO).collection('saves').doc('0').set({ badgeCount: 8 });
+      await db.collection('users').doc(ALVO).collection('saves').doc('1').set({ badgeCount: 2 });
+      await db.collection('users').doc(ALVO).collection('notifications').doc('n1').set({ tipo: 'x' });
+      /* a amizade e ESPELHADA: os dois lados existem */
+      await db.collection('users').doc(ALVO).collection('friends').doc(OUTRO).set({ uid: OUTRO });
+      await db.collection('users').doc(OUTRO).collection('friends').doc(ALVO).set({ uid: ALVO });
+      await db.collection('users').doc(ALVO).collection('friendRequests').doc(OUTRO).set({ uid: OUTRO });
+      await db.collection('users').doc(OUTRO).collection('friendRequests').doc(ALVO).set({ uid: ALVO });
+      await db.collection('users').doc(OUTRO).set({ trainerName: 'Cicrano' });
+      /* colecoes de topo com o uid como id -- inclusive uma que o codigo NUNCA nomeia */
+      await db.collection('trainerTowerRanking').doc(ALVO).set({ topDays: 4 });
+      await db.collection('trainerTowerRuns').doc(ALVO).set({ dia: 'x' });
+      await db.collection('fishingRanking').doc(ALVO).set({ pontos: 900 });
+      await db.collection('arenaRanking').doc(ALVO).set({ nivel: 12 });
+      await db.collection('onlineBattlePointer').doc(ALVO).set({ battleId: 'b1' });
+      await db.collection('colecaoQueNinguemNomeia').doc(ALVO).set({ algo: 1 });
+      /* os que usam OUTRA chave */
+      await db.collection('neighborhoodGyms').doc('g1').set({ leaderUid: ALVO, leaderName: 'Fulano' });
+      await db.collection('neighborhoodGymActiveDefenses').doc(ALVO + '_0').set({ gymId: 'g1' });
+      await db.collection('rivalries').doc([ALVO, OUTRO].sort().join('__')).set({ a: 1 });
+      await db.collection('rivalries').doc(['aaaOutro', ALVO].sort().join('__')).set({ b: 2 });
+      await db.collection('rivalries').doc('semRelacao__comEle').set({ c: 3 });
+      await db.collection('leagueCycles').doc('c1').collection('registrants').doc(ALVO).set({ uid: ALVO });
+      await db.collection('trainersLeagueCycles').doc('d1').collection('registrants').doc(ALVO).set({ uid: ALVO });
+      await db.collection('trainersLeagueCycles').doc('d1').collection('teamPicks').doc(ALVO).set({ overrides: {} });
+      await db.collection('trainersLeagueCycles').doc('d1').collection('terrainPicks').doc(ALVO).set({ picks: {} });
+      await db.collection('fishingRankingWeekly').doc('2026-09-21').collection('players').doc(ALVO).set({ pontos: 5 });
+      await db.collection('arenaRankingWeekly').doc('2026-09-21').collection('players').doc(ALVO).set({ nivel: 3 });
+      await db.collection('globalBoss').doc('mew').collection('players').doc(ALVO).set({ dano: 100 });
+      await db.collection('globalBoss').doc('mewRank').set({ top: [{ uid: ALVO, dano: 100 }, { uid: OUTRO, dano: 50 }] });
+      await db.collection('leagues').doc('champions_alltime_classic').set({
+        lista: [{ uid: ALVO, name: 'Fulano' }, { uid: OUTRO, name: 'Cicrano' }] });
+      /* ⚠️ E UM DE OUTRA PESSOA EM CADA LUGAR: sem eles, uma exclusao que apagasse a colecao
+         INTEIRA passaria em todas as travas de "sumiu". */
+      await db.collection('fishingRanking').doc(OUTRO).set({ pontos: 10 });
+      await db.collection('trainerTowerRanking').doc(OUTRO).set({ topDays: 1 });
+      await db.collection('fishingRankingWeekly').doc('2026-09-21').collection('players').doc(OUTRO).set({ pontos: 7 });
+      await db.collection('globalBoss').doc('mew').collection('players').doc(OUTRO).set({ dano: 50 });
+      await db.collection('trainerTowerDays').doc('2026-09-21').collection('players').doc(OUTRO).set({ dias: 2 });
+      await db.collection('leagueCycles').doc('c1').collection('registrants').doc(OUTRO).set({ uid: OUTRO });
+      await db.collection('neighborhoodGymActiveDefenses').doc(OUTRO + '_0').set({ gymId: 'g2' });
+    };
+    const req = (data, quem) => ({ auth: { uid: quem || ADM }, data });
+    const temOAlvo = () => Object.entries(fake.dump())
+      .filter(([k, v]) => k.indexOf(ALVO) >= 0 || JSON.stringify(v).indexOf(ALVO) >= 0)
+      .map(([k]) => k);
+
+    fake.reset(); await montar();
+    const antes = temOAlvo().length;
+    ok('  (o painel espalha a conta de verdade)', antes >= 20, antes + ' lugares com o uid');
+
+    /* FASE 1: o inventario NAO pode apagar nada -- e o que o admin ve antes de confirmar */
+    const inv = await fns.adminDeleteTrainer(req({ uid: ALVO }));
+    ok('o inventario nao apaga nada', temOAlvo().length === antes,
+       antes + ' -> ' + temOAlvo().length);
+    ok('  e ele diz o nome do treinador', inv.nome === 'Fulano', String(inv.nome));
+    ok('  e conta o que seria apagado', inv.fase === 'inventario' && inv.total > 0, 'total=' + inv.total);
+    ok('  e a colecao que NINGUEM nomeia aparece no inventario (ela foi descoberta)',
+       inv.itens.some(i => i.onde === 'colecaoQueNinguemNomeia'),
+       inv.itens.map(i => i.onde).join(', ').slice(0, 120));
+
+    /* A CONFIRMACAO POR NOME: e a unica barreira contra o clique errado num painel paginado */
+    let recusou = '';
+    try{ await fns.adminDeleteTrainer(req({ uid: ALVO, confirmarNome: 'nome errado' })); }
+    catch(e){ recusou = e.message; }
+    ok('sem o nome certo ele RECUSA', /nao confere|não confere/.test(recusou), recusou.slice(0, 60));
+    ok('  e nada foi apagado na recusa', temOAlvo().length === antes);
+
+    /* O ADMIN NAO SE APAGA */
+    let seuProprio = '';
+    try{ await fns.adminDeleteTrainer(req({ uid: ADM, confirmarNome: 'O Chefe' })); }
+    catch(e){ seuProprio = e.message; }
+    ok('o admin nao pode apagar a PROPRIA conta', /propria|própria/.test(seuProprio), seuProprio.slice(0, 60));
+
+    /* E QUEM NAO E ADMIN NAO CHEGA PERTO */
+    let semPermissao = '';
+    try{ await fns.adminDeleteTrainer(req({ uid: ALVO }, OUTRO)); }
+    catch(e){ semPermissao = e.code || e.message; }
+    ok('  e quem nao e admin nao chama', /permission-denied/.test(semPermissao), String(semPermissao));
+
+    /* FASE 2: apaga */
+    const feito = await fns.adminDeleteTrainer(req({ uid: ALVO, confirmarNome: 'Fulano' }));
+    ok('apagou', feito.fase === 'apagado', JSON.stringify(feito.fase));
+
+    /* ⚠️ A TRAVA QUE IMPORTA: o STORE INTEIRO, sem o uid em canto nenhum. */
+    const sobrou = temOAlvo();
+    ok('o uid nao existe em NENHUM lugar do banco', sobrou.length === 0,
+       sobrou.length ? sobrou.slice(0, 6).join('  |  ') : '');
+
+    /* e o que era dos OUTROS continua la -- uma exclusao que limpasse demais passaria na de cima */
+    const d = fake.dump();
+    /* ⚠️ UM VIZINHO EM CADA LUGAR QUE A EXCLUSAO TOCA. Sem os quatro ultimos, uma exclusao que
+       apagasse a subcolecao inteira (em vez de so o documento do alvo) passava MUDO -- foi a
+       conferencia de acusacao que cobrou. */
+    const doOutro = ['fishingRanking/' + OUTRO, 'trainerTowerRanking/' + OUTRO, 'users/' + OUTRO,
+                     'rivalries/semRelacao__comEle',
+                     'fishingRankingWeekly/2026-09-21/players/' + OUTRO,
+                     'globalBoss/mew/players/' + OUTRO,
+                     'trainerTowerDays/2026-09-21/players/' + OUTRO,
+                     'leagueCycles/c1/registrants/' + OUTRO,
+                     'neighborhoodGymActiveDefenses/' + OUTRO + '_0'];
+    const sumiram = doOutro.filter(k => !d[k]);
+    ok('  e o que e de OUTRA pessoa continua, em TODO lugar que a exclusao toca',
+       sumiram.length === 0, sumiram.length ? 'levou junto: ' + sumiram.join('  |  ') : doOutro.length + ' conferidos');
+    ok('  e o espelho da amizade sumiu do lado DELE', !d['users/' + OUTRO + '/friends/' + ALVO]);
+    ok('  e o ginasio ficou VAGO, nao apagado',
+       !!d['neighborhoodGyms/g1'] && d['neighborhoodGyms/g1'].leaderUid === null,
+       JSON.stringify((d['neighborhoodGyms/g1'] || {}).leaderUid));
+    ok('  e o top da raide perdeu so ele', Array.isArray((d['globalBoss/mewRank'] || {}).top) &&
+       d['globalBoss/mewRank'].top.length === 1 && d['globalBoss/mewRank'].top[0].uid === OUTRO);
+    ok('  e o mural de campeoes perdeu so ele',
+       ((d['leagues/champions_alltime_classic'] || {}).lista || []).length === 1);
+    ok('  e o login foi apagado', feito.loginApagado === true && authApagados.indexOf(ALVO) >= 0,
+       JSON.stringify(authApagados));
+
+    /* ⚠️ CONTA SEM NOME: ela existe (ha contas sem trainerName), e sem esta regra ela seria
+       IMPOSSIVEL de apagar -- a confirmacao pediria uma string vazia. */
+    fake.reset();
+    await db.collection('users').doc(ADM).set({ admin: true, trainerName: 'O Chefe' });
+    await db.collection('users').doc('semNome').set({ lastSeenAt: 1 });
+    const inv2 = await fns.adminDeleteTrainer(req({ uid: 'semNome' }));
+    ok('conta SEM nome: o inventario funciona', inv2.fase === 'inventario' && inv2.nome === '');
+    const f2 = await fns.adminDeleteTrainer(req({ uid: 'semNome', confirmarNome: 'semNome' }));
+    ok('  e a confirmacao dela e o proprio uid', f2.fase === 'apagado' && !fake.dump()['users/semNome']);
+
+    /* ⚠️ CONTA QUE NAO EXISTE nao pode estourar: o painel e paginado e o admin pode clicar duas
+       vezes -- a segunda tem que ser um no-op, nao um erro na cara dele. */
+    const f3 = await fns.adminDeleteTrainer(req({ uid: 'naoExiste', confirmarNome: 'naoExiste' }));
+    ok('apagar uma conta que nao existe nao estoura', f3.fase === 'apagado' && f3.total === 0,
+       'total=' + f3.total);
+  }
+
+
+  {
+    /* ⚠️ A TELA DO PAINEL, lida do HTML: os casos acima dirigem a CALLABLE, e passariam com a
+       tela chamando errado -- ou nem chamando. */
+    const painel = require('fs').readFileSync(path.join(__dirname, '..', 'admin-treinadores.html'), 'utf8');
+    ok('o painel tem a zona de perigo no card', /zonaDePerigoHtml\(t\)/.test(painel));
+    ok('  e ela vem DEPOIS dos saves (nao divide espaco com as acoes de liga)',
+       painel.indexOf('zonaDePerigoHtml(t)') > painel.indexOf('t.saves.map(sv => saveHtml'));
+    /* ⚠️ A FASE 1 NAO PODE MANDAR O NOME: mandando, ela viraria a exclusao direta e o inventario
+       -- que e o degrau inteiro da confirmacao -- deixaria de existir. */
+    const iVer = painel.indexOf('async function verOQueSeriaApagado');
+    const corpoVer = painel.slice(iVer, painel.indexOf('\n}', iVer));
+    ok('a fase 1 chama a callable SEM o nome (so inventaria)',
+       /adminDeleteTrainer'\)\(\{ uid \}\)/.test(corpoVer), corpoVer.slice(0, 0) + 'ok');
+    ok('  e ela nao manda confirmarNome', corpoVer.indexOf('confirmarNome') < 0);
+    const iAp = painel.indexOf('async function apagarDeVerdade');
+    const corpoAp = painel.slice(iAp, painel.indexOf('\n}', iAp));
+    ok('a fase 2 manda o confirmarNome', /confirmarNome:/.test(corpoAp));
+    ok('  e a conta sai da lista depois de apagada', /estado\.treinadores.*filter/.test(corpoAp));
+    /* ⚠️ O BOTAO SO DESTRAVA COM O NOME EXATO -- e a barreira contra o clique errado num painel
+       paginado, onde o card de cada treinador e igual ao do vizinho. */
+    const iZona = painel.indexOf('function zonaDePerigoHtml');
+    const corpoZona = painel.slice(iZona, painel.indexOf('\nasync function verOQueSeriaApagado', iZona));
+    ok('o botao de apagar so destrava com o nome EXATO',
+       /\(inv\.digitado \|\| ''\)\.trim\(\) === esperado/.test(corpoZona));
+    ok('  e o esperado cai no uid quando a conta nao tem nome',
+       /const esperado = inv\.nome \|\| t\.uid/.test(corpoZona));
+    ok('  e o inventario e mostrado item por item antes do campo',
+       corpoZona.indexOf('perigo-lista') > 0 &&
+       corpoZona.indexOf('perigo-lista') < corpoZona.indexOf('perigo-campo'));
+    /* ⚠️ O QUE FOI DIGITADO MORA NO ESTADO, e nao so no campo: o `render()` recria o HTML inteiro
+       a cada toque, entao o valor se perderia a cada letra e o botao nunca destravaria. */
+    const iDig = painel.indexOf('function digitouConfirmacao');
+    const corpoDig = painel.slice(iDig, painel.indexOf('\n}', iDig));
+    ok('o texto digitado e guardado no estado (o render recria o campo a cada letra)',
+       /estado\.apagar\[uid\]\.digitado = valor/.test(corpoDig));
+    ok('  e o cursor volta pro campo depois do render', /\.focus\(\)/.test(corpoDig));
+    /* e o CSS da zona existe -- marcacao certa com estilo faltando e a familia que este projeto
+       ja pagou tres vezes */
+    ok('  e a zona tem estilo proprio (ela nao pode parecer uma acao de liga)',
+       /\.perigo-zona\{/.test(painel) && /\.perigo-campo\{/.test(painel));
+  }
 
   console.log(falhas === 0 ? 'Tudo certo.' : falhas + ' FALHA(S)');
   process.exit(falhas === 0 ? 0 : 1);

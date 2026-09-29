@@ -146,6 +146,20 @@ function docRef(parts){
     id: parts[parts.length - 1],
     path: caminho,
     collection(nome){ return collRef(parts.concat([nome])); },
+    /* ⚠️ AS SUBCOLECOES DE UM DOCUMENTO, descobertas em vez de nomeadas. O store e um Map plano
+       'a/b/c/d' -> objeto, entao a subcolecao e o segmento SEGUINTE ao caminho deste documento --
+       e so os de indice PAR a partir dali sao colecao (o Firestore alterna colecao/documento).
+       Sem isto, quem varre uma conta pra apagar precisa de uma lista a mao, e a lista envelhece
+       na primeira subcolecao nova. */
+    async listCollections(){
+      const nomes = new Set();
+      for(const chave of store.keys()){
+        if(!chave.startsWith(caminho + '/')) continue;
+        const resto = chave.slice(caminho.length + 1).split('/');
+        if(resto.length >= 2) nomes.add(resto[0]);
+      }
+      return [...nomes].map(n => collRef(parts.concat([n])));
+    },
     async get(){
       const d = store.get(caminho);
       return { exists: d !== undefined, id: parts[parts.length-1], ref: docRef(parts), data(){ return clone(d); } };
@@ -167,12 +181,24 @@ function docRef(parts){
    um campo dos dados, e a paginacao por cursor de uma colecao inteira depende dele (e a unica ordem
    que nao precisa de indice nem de um campo que TODO documento tenha). Aqui ele e uma marca. */
 const DOC_ID = { __documentId: true };
+/* as duas chaves que o startAt/endAt por id usam -- ver a nota la */
+const ID_GE = '__id_ge__', ID_LE = '__id_le__';
 function collRef(parts, filtros, limite, ordem, depoisDe, soIds){
   filtros = filtros || [];
   const prefixo = pathOf(parts) + '/';
   return {
+    /* o `id` e o `path` de uma colecao: o Admin SDK os tem, e quem varre colecoes descobertas
+       precisa deles pra saber em qual esta. */
+    id: parts[parts.length - 1],
+    path: pathOf(parts),
     doc(id){ return docRef(parts.concat([id])); },
     where(campo, op, valor){ return collRef(parts, filtros.concat([[campo, op, valor]]), limite, ordem, depoisDe, soIds); },
+    /* ⚠️ RANGE POR ID: o Firestore aceita startAt/endAt sobre o documentId sem indice nenhum, e e
+       assim que se pega "todo documento cujo id comeca com X" (com o \uf8ff no fim, que e o ultimo
+       caractere possivel). Sem isto aqui, quem usa esse range no servidor cai no catch e o
+       documento fica -- e o teste nao ve. */
+    startAt(v){ return collRef(parts, filtros.concat([['__id_ge__', '>=', v]]), limite, ordem, depoisDe, soIds); },
+    endAt(v){ return collRef(parts, filtros.concat([['__id_le__', '<=', v]]), limite, ordem, depoisDe, soIds); },
     /* O `select()` SEM CAMPO do Firestore devolve os documentos sem dado nenhum -- serve pra quando
        só os ids interessam (o painel de treinadores usa isso pra não repetir ninguém entre páginas).
        Continua custando uma leitura por documento; o que ele economiza é payload. */
@@ -207,6 +233,9 @@ function collRef(parts, filtros, limite, ordem, depoisDe, soIds){
         if(caminho.slice(prefixo.length).includes('/')) continue;
         const id = caminho.slice(prefixo.length);
         const ok = filtros.every(([campo, op, valor])=>{
+          /* o range por ID (startAt/endAt) compara o ID do documento, nao um campo dele */
+          if(campo === ID_GE) return id >= valor;
+          if(campo === ID_LE) return id <= valor;
           const v = dados[campo];
           if(op === '==') return v === valor;
           if(op === '>=') return v !== undefined && v >= valor;
@@ -293,6 +322,48 @@ function collRef(parts, filtros, limite, ordem, depoisDe, soIds){
 function makeDb(){
   return {
     collection(nome){ return collRef([nome]); },
+    /* ⚠️ O GRUPO DE COLECOES: todo documento que esteja numa colecao com este nome, em QUALQUER
+       profundidade. No Firestore de verdade ele precisa de indice quando tem `where`; sem filtro,
+       nao precisa -- e e assim que a exclusao de conta o usa. */
+    collectionGroup(nome){
+      const caminhos = [];
+      for(const chave of store.keys()){
+        const p = chave.split('/');
+        if(p.length >= 2 && p[p.length - 2] === nome) caminhos.push(p);
+      }
+      return {
+        async get(){
+          const docs = caminhos.map(p => ({
+            id: p[p.length - 1], ref: docRef(p), exists: true,
+            data(){ return clone(store.get(p.join('/'))); }
+          }));
+          return { docs, size: docs.length, empty: docs.length === 0,
+                   forEach(f){ docs.forEach(f); } };
+        },
+        where(campo, op, valor){
+          const filtrados = caminhos.filter(p => {
+            const d = store.get(p.join('/')) || {};
+            const v = campo.split('.').reduce((o, k) => (o == null ? o : o[k]), d);
+            return op === '==' ? v === valor : op === '!=' ? v !== valor : false;
+          });
+          const docs = filtrados.map(p => ({
+            id: p[p.length - 1], ref: docRef(p), exists: true,
+            data(){ return clone(store.get(p.join('/'))); }
+          }));
+          return { async get(){ return { docs, size: docs.length, empty: docs.length === 0,
+                                         forEach(f){ docs.forEach(f); } }; } };
+        }
+      };
+    },
+    /* as colecoes de TOPO -- ver a nota do listCollections do docRef */
+    async listCollections(){
+      const nomes = new Set();
+      for(const chave of store.keys()){
+        const p = chave.split('/');
+        if(p.length >= 2) nomes.add(p[0]);
+      }
+      return [...nomes].map(n => collRef([n]));
+    },
     /* getAll: le varios documentos de uma vez. O Firestore de verdade tem, e o servidor usa pra
        checar a espera de todos os pokemon de um time numa ida so -- seis leituras soltas seriam
        seis idas de rede. Aqui e so um map, mas sem ele o teste morre com "db.getAll is not a

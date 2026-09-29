@@ -6964,6 +6964,232 @@ exports._recrutador = { recrutarParaAClassica, sortearInativoComTimeCampeao,
                         melhorSaveCampeaoDaConta, RECRUTA_INATIVO_MS,
                         RECRUTA_CANDIDATOS, RECRUTA_TENTATIVAS, RECRUTA_FUSO };
 
+
+/* ============================================================================================
+   APAGAR UMA CONTA INTEIRA (29/09/2026, a pedido: *"coloque no admin-treinadores, uma opção para
+   eu deletar aquela conta"*).
+
+   ⚠️ É A ÚNICA AÇÃO IRREVERSÍVEL DO PAINEL, e este Firestore não tem PITR -- a janela de
+   recuperação é de UMA HORA. Por isso ela tem duas fases: a primeira INVENTARIA (só lê, e devolve
+   o que seria apagado, contado) e a segunda apaga, e só depois de o admin digitar o nome do
+   treinador. É o padrão de quem pede confirmação por digitação, e aqui ele vale mais que o
+   normal: o painel é paginado e o botão errado fica a um clique do certo.
+
+   ⚠️ E ELA DESCOBRE AS COLEÇÕES EM VEZ DE NOMEÁ-LAS. Uma lista escrita à mão envelheceria na
+   primeira coleção nova -- e o sintoma seria MUDO: a conta continuaria existindo num lugar que
+   ninguém lembrou, aparecendo num ranking ou num retrospecto meses depois. O `listCollections()`
+   do Admin SDK resolve o caso mais comum (documento cujo ID é o uid) pra sempre, inclusive pras
+   coleções que ainda não existem.
+
+   ⚠️ O QUE ELE NÃO ALCANÇA ganha uma REGRA EXPLÍCITA abaixo (o espelho da amizade, o ginásio que
+   ela lidera, as inscrições em liga, o par do retrospecto). São os lugares onde a conta aparece
+   com OUTRA chave -- e são justamente os que ficariam fantasmas na tela de outra pessoa.
+
+   ⚠️ O HISTÓRICO PÚBLICO SAI JUNTO, e isso foi decisão explícita (29/09/2026): o mural de campeões
+   e o ranking da Torre também são varridos. O custo aceito é que uma liga passada pode ficar sem
+   campeão -- a alternativa (preservar) deixaria o nome de uma conta apagada na tela dos outros. */
+const APAGAR_LOTE = 300;   // um batch do Firestore aceita 500; 300 deixa folga
+
+/* apaga um documento E tudo que pende dele, descendo nas subcoleções que ele tiver */
+async function apagarDocEmProfundidade(ref, conta){
+  let n = 0;
+  for(const sub of await ref.listCollections()){
+    let snap = await sub.limit(APAGAR_LOTE).get();
+    while(!snap.empty){
+      for(const d of snap.docs){ n += await apagarDocEmProfundidade(d.ref, conta); }
+      if(conta) break;                      // contando, uma passada basta: nada some
+      snap = await sub.limit(APAGAR_LOTE).get();
+    }
+  }
+  if(!conta){ await ref.delete(); }
+  return n + 1;
+}
+
+/* ⚠️ AS REGRAS QUE O listCollections NÃO PEGA. Cada uma diz ONDE a conta aparece com outra chave.
+   `conta = true` só INVENTARIA (nenhuma escrita); `false` apaga. É a MESMA varredura nos dois
+   casos de propósito -- um inventário que percorresse caminhos diferentes da exclusão prometeria
+   uma coisa e faria outra. */
+async function varrerConta(uid, conta){
+  const achados = [];
+  const marcar = (onde, quantos) => { if(quantos > 0) achados.push({ onde, quantos }); };
+
+  const contaRef = db.collection('users').doc(uid);
+  const contaSnap = await contaRef.get();
+  const nome = contaSnap.exists ? (contaSnap.data().trainerName || '') : '';
+
+  /* ⚠️ OS ESPELHOS DA AMIZADE VÊM ANTES DE A CONTA SUMIR: a amizade é gravada nos DOIS lados, e é
+     a lista DELE que diz quem são os outros. Apagada a conta primeiro, não há mais como saber --
+     e sobraria um amigo fantasma na tela de cada um deles, pra sempre. */
+  for(const [sub, rotulo] of [['friends', 'amizades (o espelho no outro lado)'],
+                              ['friendRequests', 'pedidos de amizade recebidos']]){
+    let n = 0;
+    try{
+      const meus = await contaRef.collection(sub).get();
+      for(const d of meus.docs){
+        const espelho = db.collection('users').doc(d.id).collection(sub).doc(uid);
+        if((await espelho.get()).exists){ n++; if(!conta){ await espelho.delete(); } }
+      }
+    } catch(e){ logger.warn('Nao deu pra varrer o espelho de ' + sub + ':', e && e.message); }
+    marcar(rotulo, n);
+  }
+
+  /* 2) TODA coleção de topo cujo documento tenha o uid como id -- descoberta, não nomeada */
+  try{
+    for(const col of await db.listCollections()){
+      if(col.id === 'users') continue;   // a conta em si vai no fim, com as subcoleções
+      const ref = col.doc(uid);
+      if((await ref.get()).exists){ marcar(col.id, await apagarDocEmProfundidade(ref, conta)); }
+    }
+  } catch(e){ logger.warn('Nao deu pra varrer as colecoes de topo:', e && e.message); }
+
+  /* 3a) o ginásio do bairro que ela lidera: sem isto sobra um líder que não existe, e o desafio
+         contra ele nunca mais resolve */
+  try{
+    const gyms = await db.collection('neighborhoodGyms').where('leaderUid', '==', uid).get();
+    let n = 0;
+    for(const d of gyms.docs){
+      n++;
+      if(!conta){
+        await d.ref.set({ leaderUid: null, leaderName: null, leaderTeamCode: null,
+                          leaderSpecialties: null, leaderTerrain: null, vacatedAt: Date.now() }, { merge:true });
+      }
+    }
+    marcar('ginásios do bairro liderados (vagados)', n);
+  } catch(e){ logger.warn('Nao deu pra vagar os ginasios:', e && e.message); }
+
+  /* 3b) o índice de defesas, cujo id é uid_slot -- um range por id resolve sem varrer tudo */
+  try{
+    const defs = await db.collection('neighborhoodGymActiveDefenses')
+      .orderBy(admin.firestore.FieldPath.documentId())
+      .startAt(uid + '_').endAt(uid + '_').get();
+    let n = 0;
+    for(const d of defs.docs){ n++; if(!conta){ await d.ref.delete(); } }
+    marcar('defesas de ginásio', n);
+  } catch(e){ logger.warn('Nao deu pra varrer as defesas:', e && e.message); }
+
+  /* 3c) o retrospecto: o id é [a,b].sort().join('__'), então o uid pode estar dos DOIS lados --
+         um range de prefixo pega só metade, e por isso aqui a varredura é da coleção inteira.
+         Ela é pequena (um documento por PAR que já batalhou) e isto roda uma vez na vida da conta. */
+  try{
+    const rivs = await db.collection('rivalries').get();
+    let n = 0;
+    for(const d of rivs.docs){
+      if(String(d.id).split('__').indexOf(uid) < 0) continue;
+      n++; if(!conta){ await d.ref.delete(); }
+    }
+    marcar('retrospectos de batalha', n);
+  } catch(e){ logger.warn('Nao deu pra varrer os retrospectos:', e && e.message); }
+
+  /* 3d) as inscrições em liga e as escolhas por rodada: o id É o uid, mas elas vivem dentro de
+         cada CICLO. O grupo de coleções alcança todos de uma vez. */
+  for(const grupo of ['registrants', 'teamPicks', 'terrainPicks']){
+    try{
+      const q = await db.collectionGroup(grupo).get();
+      let n = 0;
+      for(const d of q.docs){ if(d.id !== uid) continue; n++; if(!conta){ await d.ref.delete(); } }
+      marcar(grupo === 'registrants' ? 'inscrições em liga' : grupo, n);
+    } catch(e){ logger.warn('Nao deu pra varrer ' + grupo + ':', e && e.message); }
+  }
+
+  /* 3e) TODA subcoleção `players` -- os rankings semanais das Ilhas, a raide global e os dias da
+         Torre, de uma vez.
+         ⚠️ POR GRUPO DE COLEÇÕES E NÃO VARRENDO OS PAIS, e a razão é uma regra do Firestore que
+         custou uma trava vermelha: **um documento que só tem subcoleção não aparece num `.get()`
+         da coleção**. O `fishingRankingWeekly/2026-09-21` pode nunca ter recebido um campo -- ele
+         existe só porque há `players/` pendurado nele. Varrer as semanas pra então descer nos
+         jogadores encontrava ZERO semanas e saía limpo, dizendo que não havia nada. */
+  try{
+    const jogadores = await db.collectionGroup('players').get();
+    let n = 0;
+    for(const d of jogadores.docs){ if(d.id !== uid) continue; n++; if(!conta){ await d.ref.delete(); } }
+    marcar('rankings semanais, raide e dias da Torre', n);
+  } catch(e){ logger.warn('Nao deu pra varrer as subcolecoes players:', e && e.message); }
+
+  /* 3f) o top 10 congelado da raide, que a tela lê (o documento do jogador saiu acima) */
+  try{
+    const rankRef = db.collection('globalBoss').doc(BOSS_ID + 'Rank');
+    const rank = await rankRef.get();
+    const lista = (rank.exists && Array.isArray(rank.data().top)) ? rank.data().top : [];
+    const limpa = lista.filter(x => !(x && x.uid === uid));
+    if(limpa.length !== lista.length){
+      marcar('top 10 da raide', lista.length - limpa.length);
+      if(!conta){ await rankRef.set({ top: limpa }, { merge:true }); }
+    }
+  } catch(e){ logger.warn('Nao deu pra limpar a raide:', e && e.message); }
+
+  /* 3g) o mural de campeões de todos os tempos, de cada tipo de liga */
+  try{
+    const docs = await db.collection('leagues').get();
+    let n = 0;
+    for(const d of docs.docs){
+      if(!String(d.id).startsWith('champions_alltime_')) continue;
+      const dados = d.data() || {};
+      const limpo = {};
+      for(const [k, v] of Object.entries(dados)){
+        if(Array.isArray(v)) limpo[k] = v.filter(x => !(x && x.uid === uid));
+        else if(v && typeof v === 'object' && v.uid === uid) continue;
+        else limpo[k] = v;
+      }
+      if(JSON.stringify(limpo) !== JSON.stringify(dados)){
+        n++; if(!conta){ await d.ref.set(limpo, { merge:false }); }
+      }
+    }
+    marcar('murais de campeões', n);
+  } catch(e){ logger.warn('Nao deu pra limpar os murais:', e && e.message); }
+
+  /* 4) por último a conta em si, com tudo que pende dela */
+  if(contaSnap.exists){
+    marcar('a conta e tudo dela (saves, amigos, notificações)', await apagarDocEmProfundidade(contaRef, conta));
+  }
+
+  return { nome, achados, total: achados.reduce((s, a) => s + a.quantos, 0) };
+}
+
+exports.adminDeleteTrainer = onCall(async (request) => {
+  const meu = await exigeAdmin(request);
+  const alvo = String((request.data || {}).uid || '').trim();
+  if(!alvo){ throw new HttpsError('invalid-argument', 'uid não informado.'); }
+  /* ⚠️ O ADMIN NÃO SE APAGA. Ele é quem opera o painel: apagando a própria conta, o campo `admin`
+     vai junto e não sobra ninguém pra desfazer nada. */
+  if(alvo === meu){ throw new HttpsError('failed-precondition', 'Você não pode apagar a própria conta por aqui.'); }
+
+  const confirmar = String((request.data || {}).confirmarNome || '').trim();
+  const inv = await varrerConta(alvo, true);
+
+  /* FASE 1: só inventaria. Nenhuma escrita. */
+  if(!confirmar){
+    return { fase: 'inventario', uid: alvo, nome: inv.nome, itens: inv.achados, total: inv.total };
+  }
+
+  /* FASE 2: apaga -- e só se o nome digitado bater com o do treinador.
+     ⚠️ CONTA SEM NOME existe (ver "nenhuma jornada começa sem nome de treinador"): pra ela a
+     confirmação é o próprio uid, senão ela seria impossível de apagar. */
+  const esperado = inv.nome || alvo;
+  if(confirmar !== esperado){
+    throw new HttpsError('failed-precondition', 'O nome digitado não confere. Digite exatamente: ' + esperado);
+  }
+
+  const feito = await varrerConta(alvo, false);
+
+  /* ⚠️ O LOGIN VAI POR ÚLTIMO, e de propósito: se ele fosse primeiro e a varredura falhasse no
+     meio, sobraria dado de uma conta que ninguém mais consegue acessar pra limpar. Falhando aqui,
+     o pior caso é um login sem dado nenhum -- que o jogo trata como conta nova.
+     ⚠️ E user-not-found NÃO é erro: uma conta pode existir no banco sem existir no Auth. */
+  let loginApagado = false;
+  try{
+    await admin.auth().deleteUser(alvo);
+    loginApagado = true;
+  } catch(e){
+    if(!(e && e.code === 'auth/user-not-found')){ logger.error('Conta apagada, mas o login resistiu:', e); }
+  }
+
+  logger.info('Conta apagada pelo admin ' + meu + ': uid=' + alvo + ' nome=' + (feito.nome || '(sem nome)') +
+              ' documentos=' + feito.total + ' login=' + (loginApagado ? 'apagado' : 'nao'));
+  return { fase: 'apagado', uid: alvo, nome: feito.nome, itens: feito.achados,
+           total: feito.total, loginApagado };
+});
+exports._varrerConta = varrerConta;
+
 exports.adminAddLeagueRegistration = onCall(async (request) => {
   await exigeAdmin(request);
   const alvo = String((request.data || {}).uid || '').trim();

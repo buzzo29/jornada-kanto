@@ -69,6 +69,24 @@
   .fila-nome{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .fila-linha .btn{margin:0;padding:6px 10px;font-size:.78rem;width:auto;}
   .btn.perigo{background:#c0392b;color:#fff;border-color:#8e2b20;}
+    /* ⚠️ A ZONA DE PERIGO E VISUALMENTE SEPARADA do resto do card, com um traco vermelho em cima:
+       ela e a unica acao irreversivel do painel, e ela nao pode se parecer com as de liga, que o
+       admin usa todo dia. */
+    .perigo-zona{margin-top:14px;padding-top:10px;border-top:2px dashed #c0392b;}
+    .perigo-zona.aberta{background:#fff5f4;border:2px solid #c0392b;border-radius:8px;padding:10px;margin-top:14px;}
+    .perigo-titulo{margin:0 0 6px;font-weight:800;color:#c0392b;}
+    .perigo-texto{margin:0 0 8px;font-size:.86rem;line-height:1.4;}
+    .perigo-lista{margin:0 0 10px;padding-left:18px;font-size:.82rem;color:#555;}
+    .perigo-lista li{margin:2px 0;}
+    .perigo-lista b{color:#c0392b;}
+    .perigo-campo{width:100%;box-sizing:border-box;padding:8px;border:2px solid #c0392b;border-radius:6px;
+                  font-family:inherit;font-size:.9rem;margin-bottom:8px;}
+    .perigo-botoes{display:flex;gap:8px;flex-wrap:wrap;}
+    .perigo-erro{margin:0 0 8px;color:#c0392b;font-size:.86rem;}
+    .perigo-ok{margin:0;color:#1e7a3c;font-size:.88rem;font-weight:700;}
+    /* o botao que ABRE e discreto de proposito -- o vermelho cheio fica pro que apaga de verdade */
+    .btn.perigo-fino{background:none;border:2px solid #c0392b;color:#c0392b;font-size:.82rem;padding:6px 10px;}
+    .btn.perigo-fino:disabled{opacity:.5;}
   .onde.ok{color:#1f7a3d;font-weight:700;}
   .ilhas-resumo{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin:10px 0 0;
     padding:8px 10px; border:2px solid #e07a1e; border-radius:4px; background:#fff8ef; font-size:13px; }
@@ -376,8 +394,110 @@ function treinadorHtml(t){
       ${botaoDaTrainersHtml(t)}
       ${t.saves.length ? `<div class="secao">${t.saves.length} save${t.saves.length === 1 ? '' : 's'}</div>` : ''}
       ${t.saves.length ? t.saves.map(sv => saveHtml(sv, t.uid)).join('') : '<p class="vazio">nenhum save nesta conta.</p>'}
+      ${zonaDePerigoHtml(t)}
     </div>` : ''}
   </div>`;
+}
+
+
+/* ⚠️ A ZONA DE PERIGO (29/09/2026, a pedido: *"coloque no admin-treinadores, uma opção para eu
+   deletar aquela conta"*).
+
+   ⚠️ ELA E A UNICA ACAO IRREVERSIVEL DO PAINEL, e este Firestore NAO TEM PITR -- a janela de
+   recuperacao e de uma hora. Por isso ela tem tres degraus em vez de um botao:
+     1. o botao abre o INVENTARIO (uma chamada que so LE, e conta o que existe);
+     2. o inventario mostra, item por item, o que vai sumir;
+     3. so entao o campo de confirmacao aparece, e ele pede o NOME DO TREINADOR digitado.
+
+   ⚠️ O TERCEIRO DEGRAU E O QUE IMPORTA, e ele existe por causa do painel: a lista e paginada e o
+   card de cada treinador e igual ao do vizinho -- um clique errado fica a um card de distancia.
+   Pedir o nome digitado e o que separa "eu quis apagar" de "eu cliquei errado".
+
+   ⚠️ E O BOTAO FICA NO FIM DO CARD, depois dos saves: ele nao pode dividir espaco com as acoes de
+   liga, que sao as que o admin usa todo dia. */
+function zonaDePerigoHtml(t){
+  const inv = (estado.apagar || {})[t.uid];
+  if(!inv){
+    return `<div class="perigo-zona">
+      <button class="btn perigo-fino" onclick="verOQueSeriaApagado('${esc(t.uid)}')" ${
+        estado.apagarCarregando ? 'disabled' : ''}>🗑️ Apagar esta conta…</button>
+    </div>`;
+  }
+  if(inv.erro){
+    return `<div class="perigo-zona">
+      <p class="perigo-erro">${esc(inv.erro)}</p>
+      <button class="btn secondary" onclick="fecharApagar('${esc(t.uid)}')">Fechar</button>
+    </div>`;
+  }
+  if(inv.feito){
+    return `<div class="perigo-zona">
+      <p class="perigo-ok">✅ Conta apagada: ${esc(inv.feito.nome || t.uid)} — ${inv.feito.total} documento(s)${
+        inv.feito.loginApagado ? ' e o login' : ''}.</p>
+    </div>`;
+  }
+  /* o inventario, item por item -- o admin ve o que vai sumir ANTES de digitar o nome */
+  const esperado = inv.nome || t.uid;
+  return `<div class="perigo-zona aberta">
+    <p class="perigo-titulo">⚠️ Isto não tem volta</p>
+    <p class="perigo-texto">Vai apagar <strong>${inv.total}</strong> documento(s) e o login de
+      <strong>${esc(inv.nome || '(sem nome)')}</strong>. Não há backup: o que sumir, sumiu.</p>
+    ${inv.itens && inv.itens.length ? `<ul class="perigo-lista">${
+      inv.itens.map(i => `<li>${esc(i.onde)} <b>${i.quantos}</b></li>`).join('')}</ul>`
+      : '<p class="perigo-texto">Esta conta não tem nada gravado além do login.</p>'}
+    <p class="perigo-texto">Para confirmar, digite <code>${esc(esperado)}</code>:</p>
+    <input class="perigo-campo" id="conf-${esc(t.uid)}" value="${esc(inv.digitado || '')}"
+      oninput="digitouConfirmacao('${esc(t.uid)}', this.value)" placeholder="${esc(esperado)}" autocomplete="off">
+    <div class="perigo-botoes">
+      <button class="btn perigo" onclick="apagarDeVerdade('${esc(t.uid)}')" ${
+        (inv.digitado || '').trim() === esperado && !estado.apagarCarregando ? '' : 'disabled'}>${
+        estado.apagarCarregando ? 'Apagando…' : 'Apagar para sempre'}</button>
+      <button class="btn secondary" onclick="fecharApagar('${esc(t.uid)}')">Cancelar</button>
+    </div>
+  </div>`;
+}
+async function verOQueSeriaApagado(uid){
+  estado.apagarCarregando = true; render();
+  try{
+    const r = await fns.httpsCallable('adminDeleteTrainer')({ uid });
+    const d = (r && r.data) || {};
+    estado.apagar = estado.apagar || {};
+    estado.apagar[uid] = { nome: d.nome || '', itens: d.itens || [], total: d.total || 0, digitado: '' };
+  }catch(e){
+    estado.apagar = estado.apagar || {};
+    estado.apagar[uid] = { erro: 'Não deu pra ver o que seria apagado: ' + (e && e.message ? e.message : e) };
+  }
+  estado.apagarCarregando = false; render();
+}
+/* ⚠️ O QUE FOI DIGITADO FICA NO ESTADO, e nao so no campo: o `render()` recria o HTML inteiro a
+   cada toque, entao o valor se perderia a cada letra -- e o botao nunca destravaria. */
+function digitouConfirmacao(uid, valor){
+  if(!estado.apagar || !estado.apagar[uid]) return;
+  estado.apagar[uid].digitado = valor;
+  render();
+  /* devolve o cursor pro campo, que o render acabou de recriar */
+  const campo = document.getElementById('conf-' + uid);
+  if(campo){ campo.focus(); campo.setSelectionRange(campo.value.length, campo.value.length); }
+}
+function fecharApagar(uid){
+  if(estado.apagar){ delete estado.apagar[uid]; }
+  render();
+}
+async function apagarDeVerdade(uid){
+  const inv = (estado.apagar || {})[uid];
+  if(!inv) return;
+  estado.apagarCarregando = true; render();
+  try{
+    const r = await fns.httpsCallable('adminDeleteTrainer')({ uid, confirmarNome: (inv.digitado || '').trim() });
+    const d = (r && r.data) || {};
+    estado.apagar[uid] = { feito: d };
+    /* ⚠️ E A CONTA SAI DA LISTA NA HORA: deixa-la ali com os dados velhos e convidar um segundo
+       clique numa conta que nao existe mais -- e o segundo clique nao da erro, ele so nao faz
+       nada, que e pior (o admin fica sem saber se o primeiro funcionou). */
+    estado.treinadores = (estado.treinadores || []).filter(t => t.uid !== uid);
+  }catch(e){
+    estado.apagar[uid] = { ...inv, erro: 'Não deu pra apagar: ' + (e && e.message ? e.message : e) };
+  }
+  estado.apagarCarregando = false; render();
 }
 
 function render(){

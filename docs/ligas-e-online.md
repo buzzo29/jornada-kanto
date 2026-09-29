@@ -3039,6 +3039,99 @@ de cada save, com nível, shiny, tipos e barra de vida.
   contagem é a da coleção, o resto da página vem cheio, e -- caminhando todas as páginas -- ninguém
   repete nem some. Conferido que ele acusa 4 falhas com o bloco de online removido.
 
+## APAGAR UMA CONTA PELO PAINEL (29/09/2026)
+
+Pedido assim: *"coloque no admin-treinadores, uma opção para eu deletar aquela conta"*. Com duas
+decisões tomadas antes de escrever uma linha: **o login sai junto** e **o histórico público também**.
+
+### ⚠️ É A ÚNICA AÇÃO IRREVERSÍVEL DO PAINEL, E NÃO HÁ BACKUP
+
+Este Firestore **não tem PITR** — a janela de recuperação é de **uma hora**. Por isso ela tem
+**três degraus** em vez de um botão:
+
+1. o botão abre o **inventário** — uma chamada que **só lê**, e conta o que existe;
+2. o inventário mostra, **item por item**, o que vai sumir;
+3. só então o campo de confirmação aparece, e ele pede o **nome do treinador digitado**.
+
+**⚠️ O TERCEIRO DEGRAU EXISTE POR CAUSA DO PAINEL:** a lista é paginada e o card de cada treinador
+é igual ao do vizinho — um clique errado fica a um card de distância. Pedir o nome digitado é o que
+separa *"eu quis apagar"* de *"eu cliquei errado"*.
+
+E o inventário e a exclusão são **a MESMA varredura** (`varrerConta(uid, conta)`), com uma flag. Um
+inventário que percorresse caminhos diferentes da exclusão prometeria uma coisa e faria outra.
+
+### ⚠️ ELA DESCOBRE AS COLEÇÕES EM VEZ DE NOMEÁ-LAS
+
+Uma lista escrita à mão envelheceria na primeira coleção nova — e o sintoma seria **mudo**: a conta
+continuaria existindo num lugar que ninguém lembrou, reaparecendo num ranking meses depois.
+
+O `listCollections()` do Admin SDK resolve o caso mais comum (**documento cujo ID é o uid**) pra
+sempre, inclusive pras coleções que ainda não existem. **Há trava**: o painel de teste cria uma
+`colecaoQueNinguemNomeia` e cobra que ela apareça no inventário.
+
+O que ele **não** alcança ganha regra explícita — e são justamente os lugares onde a conta ficaria
+**fantasma na tela de outra pessoa**:
+
+| onde | por quê |
+|---|---|
+| `users/{outro}/friends/{uid}` | ⚠️ a amizade é **espelhada**, e é a lista DELE que diz quem são os outros — apagada a conta primeiro, não há mais como saber |
+| `neighborhoodGyms.leaderUid` | fica **vago**, não apagado: o ginásio é de todo mundo |
+| `neighborhoodGymActiveDefenses/{uid}_{slot}` | range por id |
+| `rivalries/{a__b}` | o uid pode estar dos **dois** lados do par |
+| `registrants` / `teamPicks` / `terrainPicks` | grupo de coleções: vivem dentro de cada ciclo |
+| **toda subcoleção `players`** | os semanais das Ilhas, a raide global **e os dias da Torre** |
+| `globalBoss/mewRank` e `champions_alltime_*` | listas dentro de um documento |
+
+### ⚠️ A TRAVA QUE IMPORTA NÃO É UMA LISTA DE LUGARES
+
+Ela varre **o store inteiro no fim** e exige que o uid não apareça em canto nenhum. Uma lista só
+prova o que *eu lembrei*; a varredura prova o resto — **e ela pegou três defeitos meus**:
+
+1. o range das defesas não fechava (`endAt(uid + '_')` em vez de `uid + '_'`);
+2. e 3. os rankings semanais não sumiam, e a causa vale mais que o conserto:
+   **⚠️ UM DOCUMENTO QUE SÓ TEM SUBCOLEÇÃO NÃO APARECE NUM `.get()` DA COLEÇÃO.** Isso é regra do
+   Firestore, não do dublê: `fishingRankingWeekly/2026-09-21` pode nunca ter recebido um campo — ele
+   existe só porque há `players/` pendurado nele. Varrer as semanas pra então descer nos jogadores
+   encontrava **zero semanas** e saía limpo, dizendo que não havia nada.
+   O `collectionGroup('players')` não depende do pai existir — e de quebra cobre os semanais, a
+   raide **e os dias da Torre**, que eu nem tinha listado. Menos código e mais cobertura.
+
+**E O ESPELHO DISSO É A SEGUNDA TRAVA:** um vizinho em **cada** lugar que a exclusão toca (nove
+documentos de outra conta). Sem eles, uma exclusão que apagasse a subcoleção **inteira** — levando
+o dado de todo mundo junto — passava **MUDO**. Foi a conferência de acusação que cobrou.
+
+### AS OUTRAS SALVAGUARDAS
+
+- **⚠️ O ADMIN NÃO SE APAGA:** apagando a própria conta, o campo `admin` vai junto e não sobra
+  ninguém pra desfazer nada.
+- **⚠️ CONTA SEM NOME confirma pelo uid.** Elas existem (ver *"nenhuma jornada começa sem nome de
+  treinador"*), e sem essa regra a confirmação pediria uma string vazia — a conta seria
+  **impossível** de apagar.
+- **⚠️ O LOGIN VAI POR ÚLTIMO.** Primeiro, se a varredura falhasse no meio, sobraria dado de uma
+  conta que ninguém mais consegue acessar pra limpar. Falhando por último, o pior caso é um login
+  sem dado nenhum — que o jogo trata como conta nova. E `user-not-found` **não é erro**.
+- **Apagar duas vezes não estoura**: a segunda é um no-op, e a conta sai da lista na hora — deixá-la
+  ali convidaria um segundo clique que não faz nada, e o admin ficaria sem saber se o primeiro
+  funcionou.
+
+### ⚠️ E O DUBLÊ PRECISOU APRENDER TRÊS COISAS
+
+`listCollections`, `collectionGroup` e o range `startAt`/`endAt` por id. **Sem elas a trava daria
+verde sem ter varrido nada**: a varredura envolve cada passo em `try/catch` (pra a exclusão não
+parar no meio), então um método que falta cai no catch **em silêncio** — o jeito mais silencioso
+possível de um teste mentir. Foi assim que a defesa de ginásio ficou pra trás na primeira rodada.
+
+**Medido a 320px:** a zona fechada ocupa **83px**, a aberta com 7 itens **414px** e a de conta sem
+nome **433px**, sem estouro de largura e sem texto cortado.
+
+`tools/test-admin.js` tranca 25 pontas: o inventário não apagando nada, a confirmação por nome, o
+admin não se apagando, quem não é admin não chamando, **o uid não existindo em lugar nenhum**, os
+nove vizinhos intactos, o ginásio vago (não apagado), o top da raide e o mural perdendo só ele, o
+login apagado, a conta sem nome, a conta inexistente — mais as da tela (os três degraus, o botão só
+destravando com o nome exato, o digitado indo pro estado). **Conferido: os 16 defeitos religados
+acusam.**
+
+
 ## A FILA DA LIGA CLÁSSICA NO PAINEL (21/09/2026)
 
 Pedido assim: *"no admin-treinadores, coloque uma sessão para eu ver a fila de inscrição da liga
