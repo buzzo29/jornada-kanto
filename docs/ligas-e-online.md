@@ -2520,12 +2520,18 @@ mais forte.
 
 | | agenda |
 |---|---|
-| **dia** (07h–22h59) | `*/5 7-22 * * *` |
+| **dia** (07h–22h59) | `*/10 7-22 * * *` |
 | **noite** (23h–06h59) | `0 23,0,1,2,3,4,5,6 * * *` |
 
-⚠️ **SÃO DUAS, e não uma que pula.** Uma agenda de 5 min que ignorasse 11 de cada 12 voltas à
-noite gastaria 11 invocações por hora pra não fazer nada, e a condição do horário viveria no
+⚠️ **SÃO DUAS, e não uma que pula.** Uma agenda de 10 min que ignorasse 5 de cada 6 voltas à
+noite gastaria 5 invocações por hora pra não fazer nada, e a condição do horário viveria no
 CÓDIGO em vez de na agenda — onde ela é visível no console.
+
+⚠️ **O DIA ERA A CADA 5 MIN ATÉ 28/09/2026** (*"mude a nossa função que inscreve um treinador a
+cada 5min automaticamente, para inscrever a cada 10min"*). Mudou **só a agenda** — o recrutador é
+o mesmo, e ele já engole a volta em que não acha ninguém. Ou seja o ritmo é um **teto** de
+inscrições por hora e não uma promessa: de **12 por hora** ele passou a **6**, e o teto por dia de
+**192 para 96**.
 
 ⚠️ **E O FUSO É O DO JOGO (`America/Sao_Paulo`), não o UTC que o `onSchedule` usa por padrão.**
 "Das 07h às 23h" é o horário que o jogador vê; sem isso a janela sairia **3 horas deslocada**.

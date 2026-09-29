@@ -6941,15 +6941,19 @@ async function recrutarParaAClassica(){
   }
 }
 
-/* ⚠️ SÃO DUAS AGENDAS, e não uma que pula: o pedido tem dois ritmos (a cada 5min das 07h às 23h,
-   de hora em hora das 23h às 07h). Uma agenda de 5min que ignorasse 11 de cada 12 voltas à noite
-   gastaria 11 invocações por hora pra não fazer nada, e a condição do horário viveria no CÓDIGO em
-   vez de na agenda -- onde ela é visível no console.
+/* ⚠️ SÃO DUAS AGENDAS, e não uma que pula: são dois ritmos (a cada 10min das 07h às 23h, de hora
+   em hora das 23h às 07h). Uma agenda de 10min que ignorasse 5 de cada 6 voltas à noite gastaria 5
+   invocações por hora pra não fazer nada, e a condição do horário viveria no CÓDIGO em vez de na
+   agenda -- onde ela é visível no console.
+   ⚠️ O DIA ERA 5min ATÉ 28/09/2026, e a mudança é só a agenda: o recrutador em si é o mesmo, e ele
+   já engole a volta em que não acha ninguém elegível (`sem ciclo com inscrições abertas` /
+   `nenhum inativo elegível nesta volta`). Ou seja o ritmo é um TETO de inscrições por hora, não
+   uma promessa -- de 12 por hora ele passou a 6.
    ⚠️ E O FUSO É O DO JOGO (America/Sao_Paulo), não o UTC que o `onSchedule` usa por padrão: "das
    07h às 23h" é o horário que o jogador vê. Sem isto a janela sairia 3 horas deslocada. */
 const RECRUTA_FUSO = 'America/Sao_Paulo';
 exports.recrutarLigaDeDia = onSchedule(
-  { schedule: '*/5 7-22 * * *', timeZone: RECRUTA_FUSO },
+  { schedule: '*/10 7-22 * * *', timeZone: RECRUTA_FUSO },
   async () => { await recrutarParaAClassica().catch(e => logger.error('Recrutador (dia):', e)); });
 exports.recrutarLigaDeNoite = onSchedule(
   { schedule: '0 23,0,1,2,3,4,5,6 * * *', timeZone: RECRUTA_FUSO },

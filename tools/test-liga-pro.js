@@ -975,8 +975,8 @@ console.log('\n=== O PAINEL INSCREVE NA TRAINERS LEAGUE (27/09/2026) ===');
       const SRV = srvSrc;
       /* ⚠️ E AS DUAS AGENDAS SAO OS DOIS RITMOS DO PEDIDO, no FUSO DO JOGO: o `onSchedule` usa UTC
          por padrao, e "das 07h as 23h" e o horario que o jogador ve. */
-      ok('a agenda do DIA e a cada 5min das 07h as 22h59',
-         /schedule: '\*\/5 7-22 \* \* \*'/.test(SRV), (SRV.match(/\*\/5 7-22 \* \* \*/) || ['(nao achei)'])[0]);
+      ok('a agenda do DIA e a cada 10min das 07h as 22h59',
+         /schedule: '\*\/10 7-22 \* \* \*'/.test(SRV), (SRV.match(/\*\/\d+ 7-22 \* \* \*/) || ['(nao achei)'])[0]);
       ok('a agenda da NOITE e de hora em hora das 23h as 06h',
          /schedule: '0 23,0,1,2,3,4,5,6 \* \* \*'/.test(SRV));
       ok('  e as duas no fuso do JOGO, nao em UTC',
