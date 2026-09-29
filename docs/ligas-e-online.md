@@ -3130,6 +3130,100 @@ composto, que também achou zero).
 
 **Os 16 defeitos religados acusam** (2 a 12 falhas cada).
 
+## A TRAINERS LEAGUE MORREU ÀS 17h POR TAMANHO DE DOCUMENTO (28/09/2026)
+
+Relatado com print: *"analise a Trainers League, ela parou de rodar as 17h"* — a tela mostrando a
+rodada **12 de 15** marcada pras 17:00 e os oito confrontos em *"Aguardando o horário da batalha"*.
+
+**Não foi o relógio.** O log da `advanceTrainersLeague` diz:
+
+```
+Document '.../trainersLeagueCycles/2026-09-28' cannot be written because its size
+(1,236,950 bytes) exceeds the maximum allowed size of 1,048,576 bytes.
+```
+
+O documento do ciclo **estourou o limite de 1 MiB do Firestore**. A rodada 12 foi a que o empurrou
+pra além do teto, e a partir dali o cron repetiu o mesmo `INVALID_ARGUMENT` **a cada minuto até a
+meia-noite**.
+
+### ⚠️ A CAUSA: EM MEMÓRIA É UMA REFERÊNCIA, NO FIRESTORE É UMA CÓPIA
+
+O `buildRoundRobinSchedule` punha o objeto do **inscrito inteiro** em cada `match.a`/`match.b`.
+No JavaScript isso é a MESMA referência e não custa nada — foi por isso que passou despercebido.
+Serializado, **cada partida ganha uma cópia**.
+
+E o inscrito carrega a conta toda: `eligibleCodes` (todos os times campeões dele) e
+`eligibleAtaques` (o mapa de golpes da conta, **24 entradas para um time de 6**).
+
+**MEDIDO no documento real, campo a campo:**
+
+| numa partida resolvida | |
+|---|---|
+| `a` | 3,5 KB |
+| `b` | 3,6 KB |
+| `winner` — **uma cópia inteira de `a` ou `b`** | 4,4 KB |
+| dentro de cada lado | `eligibleAtaques` 1,1 · `eligibleCodes` 0,4 · `ataques` 1,1 KB |
+
+O `scheduleRounds` era **97,3%** do documento, e havia **264 cópias** do mapa de golpes — que é
+exatamente **88 partidas resolvidas × 3**.
+
+**⚠️ E A LIGA CLÁSSICA NÃO SOFRE DISSO, que é por que só esta estourou:** ela é **eliminatória**
+(4 rodadas), e a Trainers é **round-robin** — com 16 jogadores são **15 rodadas**, então cada um
+aparece 15 vezes levando a conta junto.
+
+**⚠️ E NINGUÉM LÊ ESSES CAMPOS DE DENTRO DO MATCH** (varrido nos dois arquivos): a resolução lê o
+documento **fresco do inscrito**, com o `data.players` do ciclo como reserva — e o `data.players`
+continua completo, que é o que mantém a reserva funcionando.
+
+### O CONSERTO SÃO DUAS PEÇAS, E A SEGUNDA É A QUE DESTRAVOU O DIA
+
+1. **`ladoDoMatch`** — o chaveamento passa a guardar no match só `{uid, name, elite,
+   specialties}`. O `specialties` fica porque o `applySpecialtyBuff` o lê na hora de resolver:
+   enxugar demais trocaria um defeito de tamanho por um de **batalha**, que é muito pior.
+2. **`enxugarCicloParaGravar`** — roda **antes de toda gravação** do documento do ciclo. A peça 1
+   só vale pras ligas montadas de agora em diante; **um ciclo que já estourou continuaria estourado
+   pra sempre**. Com ela, a próxima gravação enxuga o que já está lá e a liga travada **volta a
+   andar sozinha no tique seguinte, sem ninguém tocar no banco**.
+
+   Ela também remove o `ataques` das partidas **já resolvidas**: ele é lido só pelo
+   `carimbaDoMatch`, **durante** a resolução (varrido), e depois é peso morto — três cópias por
+   partida.
+
+**⚠️ E O `ataques` DE UMA PARTIDA NÃO RESOLVIDA NÃO PODE SER TOCADO:** tirado cedo, o time entra
+sem os golpes escolhidos e **a batalha muda**. Há caso de acusação religando exatamente isso.
+
+### O QUE ISSO DEU, NO DOCUMENTO REAL QUE TRAVOU
+
+| | |
+|---|---|
+| antes | 1.210 KB |
+| depois | **107 KB — 91,1% menor** |
+| projetado no Firestore | **~110 KB** de 1.048.576 → **90% de folga** |
+| `uid`, `name`, `specialties` nas 120 partidas | **intactos** |
+| o `players` do ciclo | **continua completo** (a reserva da resolução) |
+
+**NO MOTOR, NADA:** `MOTOR a9075d0e4899 / DIARIO 9a0ae4840b92`, idêntico.
+
+### ⚠️ E A TRAVA QUASE MEDIU O CONJUNTO VAZIO
+
+A trava do *"o ciclo cabe no documento"* precisa de um painel que **reproduza o inchaço** — e o
+primeiro dava **416 KB**, que já cabe: ela ficava verde **com e sem** o enxugador.
+
+Quem pegou foi uma **sentinela** ao lado dela (*"o painel reproduz o inchaço: sem enxugar ele
+estoura"*), e é ela que impede o painel de ser "simplificado" de volta. Hoje o painel é
+**calibrado pelo documento real medido** (~1,1 KB de golpes e ~0,4 KB de códigos por lado) e dá
+**1.636 KB sem enxugar → 218 KB depois**.
+
+É a mesma lição de sempre aqui: **zero não é um resultado bom, é não ter medido** — e um "cabe" só
+vale quando o painel consegue não caber.
+
+`tools/test-liga-treinadores.js` tranca 16 pontas: o tamanho (com a sentinela), `uid`/`name`/
+`specialties` sobrevivendo, nenhum campo do inscrito dentro do match, o `ataques` saindo só das
+resolvidas, o `players` completo, o enxugador sendo chamado **antes das duas gravações** (lido do
+código — os casos o chamam na mão e passariam com a chamada órfã), e as **três funções idênticas
+nos dois motores**. **Conferido: os 8 defeitos religados acusam.**
+
+
 ## A TRAINERS LEAGUE ABRIA EM CINCO NÍVEIS, E O BOTÃO MENTIA (28/09/2026)
 
 Relatado assim: *"a tela da trainers league, sempre quando eu abro demora pra carregar as

@@ -5552,6 +5552,44 @@ function trainersLeagueDateStrPlusDays(dateStr, days){
   return trainersLeagueDateStrFromTime(t + days*24*60*60*1000);
 }
 
+/* ⚠️ O QUE UM LADO DA PARTIDA PRECISA CARREGAR -- e so isso (28/09/2026).
+   O montador punha o objeto do INSCRITO inteiro em cada `match.a`/`match.b`. Em memoria isso e a
+   MESMA referencia e nao custa nada; no Firestore vira uma COPIA por partida, e o round-robin de 16
+   tem 15 rodadas -- cada jogador aparece 15 vezes, levando junto a lista de todos os times da conta
+   (`eligibleCodes`) e o mapa de golpes dela (`eligibleAtaques`, ~24 entradas pra um time de 6).
+   ⚠️ FOI ISSO QUE MATOU A LIGA DE 28/09/2026: o documento do ciclo passou de 1 MiB na rodada 12 de
+   15 (1.236.950 bytes contra o limite de 1.048.576) e o Firestore parou de aceitar a gravacao. A
+   liga travou as 17h e o cron repetiu o mesmo erro a cada minuto ate a meia-noite.
+   ⚠️ E NINGUEM LE ESSES CAMPOS DE DENTRO DO MATCH (conferido por varredura nos dois arquivos): a
+   resolucao le o documento FRESCO do inscrito, com o `data.players` do ciclo como reserva -- e o
+   `data.players` continua completo, que e o que mantem a reserva funcionando.
+   ⚠️ O `specialties` FICA: ele e lido pelo `applySpecialtyBuff` na hora de resolver, e ele e
+   pequeno (um tipo). O `elite` e o `slot` tambem, pelo mesmo motivo. */
+function ladoDoMatch(p){
+  if(!p) return p;
+  return { uid:p.uid, name:p.name, elite: !!p.elite, specialties: p.specialties || [] };
+}
+/* ⚠️ A REDE DE SEGURANCA, e ela e o que conserta o que JA ESTA GRAVADO: o `ladoDoMatch` acima so
+   vale pras ligas montadas de agora em diante, e um ciclo que ja estourou continuaria estourado
+   pra sempre. Esta funcao roda antes de TODA gravacao do documento do ciclo, entao a proxima
+   gravacao enxuga o que ja esta la -- e a liga travada volta a andar sozinha no tique seguinte.
+   ⚠️ E ELA TAMBEM TIRA O `ataques` DAS PARTIDAS JA RESOLVIDAS: ele e lido SO pelo
+   `carimbaDoMatch`, durante a resolucao (conferido por varredura). Depois que a partida acabou
+   ele e peso morto -- e sao tres copias dele por partida (a, b e o winner). */
+const CAMPOS_QUE_NAO_VAO_PRO_MATCH = ['eligibleCodes', 'eligibleAtaques', 'mewtwoTeamCode'];
+function enxugarCicloParaGravar(data){
+  if(!data || !Array.isArray(data.scheduleRounds)) return data;
+  for(const rodada of data.scheduleRounds){
+    for(const match of ((rodada && rodada.matches) || [])){
+      for(const lado of [match.a, match.b, match.winner]){
+        if(!lado || typeof lado !== 'object') continue;
+        for(const campo of CAMPOS_QUE_NAO_VAO_PRO_MATCH){ if(campo in lado) delete lado[campo]; }
+        if(match.resolved && 'ataques' in lado) delete lado.ataques;
+      }
+    }
+  }
+  return data;
+}
 function buildRoundRobinSchedule(players){
   const list = players.slice();
   if(list.length % 2 !== 0) list.push(null);
@@ -5589,7 +5627,7 @@ function buildRoundRobinSchedule(players){
       else if(awayCount[p2.uid] > awayCount[p1.uid]) { home=p2; away=p1; }
       else { home=p1; away=p2; }
       homeCount[home.uid]++; awayCount[away.uid]++;
-      return { a:home, b:away, winner:null, matchups:null, resolved:false, terrain:null };
+      return { a:ladoDoMatch(home), b:ladoDoMatch(away), winner:null, matchups:null, resolved:false, terrain:null };
     })
   }));
   // 3) polimento: passa de novo trocando mandante/visitante de uma partida sempre que isso reduz o
@@ -5788,6 +5826,9 @@ async function trainersLeagueLockGroupInto(cycleId, group, dateId){
   const startTime = Math.max(normalStartTime, Date.now());
   const roundTimes = [];
   for(let i=0;i<numRounds;i++){ roundTimes.push(startTime + i*TRAINERS_LEAGUE_ROUND_MS); }
+  /* rede: o `ladoDoMatch` ja entrega o chaveamento enxuto, mas quem grava e quem responde pelo
+     tamanho -- e um caminho novo que volte a inchar o match nao pode passar por aqui calado. */
+  enxugarCicloParaGravar({ scheduleRounds });
   await trainersLeagueCycleRef(cycleId).set({
     dateId: cycleId, status: numRounds>0 ? 'locked' : 'complete',
     players, scheduleRounds, roundTimes, currentRound: 0,
@@ -6068,6 +6109,10 @@ async function trainersLeagueAdvanceRounds(dateId){
       }
       finalStandings = standings;
     }
+    /* ⚠️ ENXUGA ANTES DE GRAVAR, e e esta linha que conserta um ciclo que JA estourou: a
+       gravacao vem inteira (`merge:false`), entao o documento que sobe e o enxugado -- e um dia
+       travado por tamanho volta a andar sozinho no tique seguinte, sem ninguem mexer no banco. */
+    enxugarCicloParaGravar(data);
     await ref.set(data, { merge:false });
     /* DAQUI PRA BAIXO o estado já está salvo: a partida não vai ser resolvida de novo, então
        anunciá-la é seguro. E COM `await`: sem ele a Cloud Function podia ser encerrada no meio,
@@ -7454,6 +7499,9 @@ exports._formaNoNivel = formaNoNivel;
 exports._drawCycle = drawCycle;
 exports._advanceLeagueOnceForType = advanceLeagueOnceForType;
 exports._trainersLeagueSplitGroups = trainersLeagueSplitGroups;
+exports._enxugarCicloParaGravar = enxugarCicloParaGravar;
+exports._buildRoundRobinSchedule = buildRoundRobinSchedule;
+exports._ladoDoMatch = ladoDoMatch;
 exports._trainersLeagueGatherEligibleCodes = trainersLeagueGatherEligibleCodesForUid;
 exports._decodeTeamCode = decodeTeamCode;
 exports._carimbaDoMatch = carimbaDoMatch;         // o teste confere que o golpe chega na liga

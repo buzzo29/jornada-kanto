@@ -589,6 +589,120 @@ console.log('\n=== OS GOLPES ESCOLHIDOS CHEGAM NA LIGA E NO ONLINE (16/09/2026) 
     await insc.doc('duda').delete(); await insc.doc('fausto').delete();
   }
 
+  console.log('\nO DOCUMENTO DO CICLO NAO PODE PASSAR DE 1 MiB (28/09/2026)');
+  {
+    /* ⚠️ A LIGA DE 28/09/2026 MORREU AS 17h POR TAMANHO, na rodada 12 de 15: o documento do ciclo
+       chegou a 1.236.950 bytes contra o limite de 1.048.576 do Firestore, e o cron repetiu o mesmo
+       INVALID_ARGUMENT a cada minuto ate a meia-noite. A causa era o chaveamento: ele punha o
+       objeto do INSCRITO inteiro em cada `match.a`/`match.b` -- em memoria e a mesma referencia e
+       nao custa nada, no Firestore vira uma copia por partida. Com 15 rodadas, cada jogador leva
+       a lista de todos os times da conta 15 vezes.
+       ⚠️ A CLASSICA NAO SOFRE DISSO, e e por isso que so a Trainers estourou: ela e eliminatoria
+       (4 rodadas), e esta e round-robin (15). */
+    /* ⚠️ CALIBRADO PELO DOCUMENTO REAL de 28/09, medido campo a campo: ~1,1 KB de
+       `eligibleAtaques` e ~0,4 KB de `eligibleCodes` por lado, 1.210 KB no total. Um painel
+       menor NAO SERVE -- com 8 saves e 24 golpes ele dava 416 KB, que cabe no limite, e a trava
+       do 'cabe' ficava verde COM e SEM o enxugador. A sentinela logo abaixo existe pra isso. */
+    const ataquesDeUmaConta = {};
+    for(let i = 0; i < 72; i++) ataquesDeUmaConta['especieumpoucolonga' + i + ':70'] = ['thunderbolt', 'earthquake'];
+    const codigo = Array.from({length:6}, (_, i) => 'especieumpoucolonga' + i + ':70:0').join(',');
+    const inscritos = Array.from({length:16}, (_, i) => ({
+      uid: 'u' + i, name: 'Treinador ' + i, elite: false, specialties: ['Water'],
+      eligibleCodes: Array.from({length:20}, () => codigo),
+      eligibleAtaques: ataquesDeUmaConta, mewtwoTeamCode: codigo
+    }));
+
+    const rodadas = fns._buildRoundRobinSchedule
+      ? fns._buildRoundRobinSchedule(inscritos) : null;
+    ok('  (o montador esta alcancavel pelo teste)', !!rodadas && rodadas.length === 15,
+       rodadas ? rodadas.length + ' rodadas' : 'nao exportado');
+    if(rodadas){
+      /* ⚠️ A TRAVA QUE IMPORTA E O TAMANHO, e nao a ausencia de um campo: e o tamanho que derrubou
+         a liga, e um caminho novo que volte a inchar o match por outro campo passaria por uma trava
+         que so olhasse os tres nomes de hoje. */
+      const ciclo = { dateId:'2026-09-28', status:'active', players: inscritos,
+                      scheduleRounds: rodadas, roundTimes: rodadas.map((_, i) => i), currentRound: 0 };
+      /* simula o dia inteiro resolvido, que e o pior caso: e ai que ele estourou */
+      for(const rd of ciclo.scheduleRounds){
+        for(const m of rd.matches){
+          m.a.code = codigo; m.b.code = codigo;
+          m.a.ataques = ataquesDeUmaConta; m.b.ataques = ataquesDeUmaConta;
+          m.resolved = true; m.matchups = null; m.logStored = true;
+          m.terrain = { id:'praia_ensolarada', name:'Praia Ensolarada', type:'Water' };
+          m.winner = JSON.parse(JSON.stringify(m.a));
+        }
+      }
+      const LIMITE = 1048576;
+      const bruto = JSON.stringify(ciclo).length;
+      fns._enxugarCicloParaGravar(ciclo);
+      const enxuto = JSON.stringify(ciclo).length;
+      ok('  (o painel reproduz o inchaco: sem enxugar ele estoura)', bruto > LIMITE,
+         (bruto/1024).toFixed(0) + ' KB sem enxugar');
+      ok('o ciclo de 16 x 15 rodadas cabe no documento, resolvido inteiro', enxuto < LIMITE * 0.5,
+         (enxuto/1024).toFixed(0) + ' KB  (limite ' + (LIMITE/1024).toFixed(0) + ' KB)');
+
+      /* ⚠️ E O QUE SOBRA TEM QUE CONTINUAR SERVINDO A RESOLUCAO: o `specialties` alimenta o
+         `applySpecialtyBuff`, e o uid/nome sao lidos pela tela e pelas notificacoes. Enxugar demais
+         seria trocar um defeito de tamanho por um de batalha, que e muito pior. */
+      let faltando = 0, pesadosQueSobraram = 0, comAtaques = 0, n = 0;
+      for(const rd of ciclo.scheduleRounds) for(const m of rd.matches){
+        for(const l of [m.a, m.b, m.winner]){
+          n++;
+          if(!l.uid || !l.name || !Array.isArray(l.specialties)) faltando++;
+          for(const c of ['eligibleCodes','eligibleAtaques','mewtwoTeamCode']) if(c in l) pesadosQueSobraram++;
+          if('ataques' in l) comAtaques++;
+        }
+      }
+      ok('  e uid, nome e specialties sobrevivem em todos os lados', faltando === 0, faltando + ' de ' + n);
+      ok('  e nenhum campo do INSCRITO sobra dentro do match', pesadosQueSobraram === 0, pesadosQueSobraram + ' sobraram');
+      ok('  e o `ataques` sai das partidas ja resolvidas', comAtaques === 0, comAtaques + ' ainda tem');
+      ok('  e o `players` do ciclo continua COMPLETO (e a reserva da resolucao)',
+         !!(ciclo.players[0] && ciclo.players[0].eligibleCodes && ciclo.players[0].eligibleAtaques));
+    }
+
+    /* ⚠️ O `ataques` DE UMA PARTIDA NAO RESOLVIDA TEM QUE FICAR: ele e lido pelo `carimbaDoMatch`
+       DURANTE a resolucao. Tirado cedo, o time entra sem os golpes escolhidos e a batalha muda --
+       um defeito de tamanho viraria um de mecanica, em silencio. */
+    {
+      const naoResolvida = { scheduleRounds: [{ matches: [{ resolved:false,
+        a:{ uid:'x', name:'X', specialties:[], ataques:{ 'pikachu:50':['thunderbolt'] }, eligibleCodes:['a'] },
+        b:{ uid:'y', name:'Y', specialties:[], ataques:{ 'onix:50':['rockthrow'] }, eligibleCodes:['b'] },
+        winner:null }] }] };
+      fns._enxugarCicloParaGravar(naoResolvida);
+      const m = naoResolvida.scheduleRounds[0].matches[0];
+      ok('o `ataques` de uma partida NAO resolvida nao e tocado',
+         !!(m.a.ataques && m.a.ataques['pikachu:50']) && !!(m.b.ataques && m.b.ataques['onix:50']));
+      ok('  mas os campos do inscrito saem dela tambem', !('eligibleCodes' in m.a) && !('eligibleCodes' in m.b));
+      ok('  e um winner nulo nao quebra o enxugador', m.winner === null);
+    }
+
+    /* ⚠️ O ENXUGADOR TEM QUE SER CHAMADO ANTES DE TODA GRAVACAO DO CICLO -- lido do CODIGO, porque
+       os casos acima o chamam na mao e passariam com a chamada orfa. E a mesma trava que o
+       `applySpecialtyBuff` e o `equiparItens` ja tem. */
+    {
+      const srv = require('fs').readFileSync(path.join(__dirname, '..', 'functions', 'index.js'), 'utf8');
+      const iAv = srv.indexOf('await ref.set(data, { merge:false });');
+      const antesDoSet = srv.slice(Math.max(0, iAv - 400), iAv);
+      ok('o avanco de rodadas enxuga ANTES de gravar', /enxugarCicloParaGravar\(data\)/.test(antesDoSet));
+      const iLock = srv.indexOf('dateId: cycleId, status: numRounds>0');
+      ok('  e a trava do chaveamento tambem',
+         /enxugarCicloParaGravar\(/.test(srv.slice(Math.max(0, iLock - 400), iLock)));
+      /* ⚠️ E O MONTADOR NAO PODE VOLTAR A COPIAR O INSCRITO: a rede da gravacao conserta o
+         sintoma, mas a causa e aqui -- e sem esta linha alguem a desfaz e so o tamanho acusa. */
+      ok('  e o chaveamento passa pelo ladoDoMatch', /a:ladoDoMatch\(home\), b:ladoDoMatch\(away\)/.test(srv));
+      /* ⚠️ E AS DUAS COPIAS ANDAM JUNTAS: o `buildRoundRobinSchedule` vive nos DOIS arquivos, e
+         uma divergencia ali faz a mesma liga sair diferente no cliente e no servidor. */
+      const cli = require('fs').readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+      const recorte = (t, nome) => { const i = t.indexOf(nome); return i < 0 ? '' : t.slice(i, t.indexOf('\n}\n', i) + 2); };
+      const norm = x => x.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '').replace(/\s+/g, ' ').trim();
+      for(const nome of ['function buildRoundRobinSchedule(', 'function ladoDoMatch(', 'function enxugarCicloParaGravar(']){
+        const a = norm(recorte(cli, nome)), b = norm(recorte(srv, nome));
+        ok('  ' + nome.replace('function ', '').replace('(', '') + ' e IGUAL nos dois motores',
+           !!a && a === b, a === b ? '' : (a ? 'divergem' : 'falta no cliente'));
+      }
+    }
+  }
+
 console.log(falhas ? '\n' + falhas + ' FALHA(S)\n' : '\nTudo certo.\n');
   process.exit(falhas ? 1 : 0);
 })();
