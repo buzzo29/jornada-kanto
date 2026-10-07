@@ -3104,6 +3104,105 @@ acontecendo"*. E não era o Mewtwo: era o **laço de revelação** que ele usa.
 - Conferido que o teste acusa com a declaração de volta pra baixo: **`parou em 0/10`**, que é
   exatamente o que o jogador via.
 
+## AVANÇAR PARA O FIM (07/10/2026)
+
+Pedido assim: *"No meio da batalha adicione um botão abaixo do quadro de batalha escrito 'Avançar
+para o fim' e assim ja vai automaticamente para o fim da batalha exibindo ja o log da partida"*.
+
+Um botão discreto **abaixo do quadro de batalha**, que pula a animação e vai direto pra tela do log.
+
+#### ⚠️ ELE É SEGURO PORQUE A BATALHA JÁ ESTÁ CALCULADA QUANDO A ANIMAÇÃO COMEÇA
+
+O motor roda **antes** — no servidor (Torre, Ginásio da Cidade) ou de uma vez no cliente (jornada,
+Elite, rival) — e o que a tela faz depois é **pintar** matchups que já vieram prontos. Pular a
+pintura não pula nada do jogo.
+
+**E ISSO FOI VARRIDO, NÃO SUPOSTO.** Os três laços de revelação foram lidos atrás de qualquer
+decisão de mecânica (`Math.random`, nível, sketch, save, Pokédex, moeda):
+
+| laço | telas que ele serve | decide alguma coisa? |
+|---|---|---|
+| `advanceReveal` | jornada, Ginásio da Cidade | **não — só pinta** |
+| `advanceTrainerReveal` | Torre, Boss, Seleção, treinador por código | **não — só pinta** |
+| `advanceSpecialReveal` | rival, Rocket, Elite, montanha, vigília | ⚠️ **uma: a emboscada** |
+
+#### ⚠️ A EXCEÇÃO É O ESCONDERIJO DA ROCKET, E ELA NÃO É GOSTO
+
+A emboscada da Jigglypuff é **sorteada DENTRO do laço** — na fase `'loading'` de cada confronto
+(`Math.random() < ROCKET_SLEEP_CHANCE`), e só quando `context === 'rocket'`. Pular a animação ali
+pularia o sorteio dos confrontos que ainda não foram animados: **o botão tornaria o jogador imune a
+uma mecânica que custa um pokémon**. Então no esconderijo ele não existe.
+
+Os **outros** contextos da mesma tela (rival, Elite, montanha, vigília) não sorteiam nada e ficam —
+a exceção é do CONTEXTO, não da tela.
+
+#### O QUE FOI MEDIDO
+
+**1.600 comparações PAREADAS, 1.600 idênticas.** A mesma batalha rodada dos dois jeitos — assistindo
+até o fim contra apertar o botão no passo 1, 3, 7 e 20 — e comparado o estado do jogo depois: a tela
+de destino, quem venceu, os confrontos e o **time** (espécie, nível, HP, teto).
+
+| | comparações | idênticas |
+|---|---|---|
+| TORRE (`trainerBattling`) | 800 | **800** |
+| JORNADA (`battling`) — onde o fim da batalha **dá nível e evolui** | 800 | **800** |
+
+⚠️ **E O PAINEL NÃO É DEGENERADO:** o time da jornada entra com um **Pupitar Lv.54** e todos caídos,
+então o +1 do desmaio é o nível da evolução — **200 de 200** terminam com Tyranitar. Sem isso a
+medição provaria que o botão não quebra um caminho que ela nunca exercitou.
+
+⚠️ **E O INSTRUMENTO É SENSÍVEL**, conferido: com o botão religado pra pular **um** confronto em vez
+de ir ao fim, as 1.600 passam a diferir — e o diagnóstico nomeia o quê (a tela, o Pupitar que não
+vira Tyranitar, os níveis que não sobem, a derrota que não conta).
+
+⚠️ **E A PRIMEIRA VERSÃO DO HARNESS DEU "800 DE 800 DIFERENTES" SEM UM ÚNICO DEFEITO NO JOGO:** ela
+gerava a batalha **duas vezes**, uma por lado — e o `simulateGymBattle` sorteia. Ela media o MOTOR,
+não o botão. Hoje a batalha é gerada uma vez e cada lado recebe uma **cópia profunda** (profunda
+porque o fim da batalha **muta** o resultado: ele escreve o nível no `playerStatus`).
+
+#### AS DECISÕES
+
+- **⚠️ ELE NÃO CHAMA O `finish*` DIRETO — ele PULA o laço pro último confronto e deixa o PRÓPRIO
+  laço terminar.** O ramo final de cada um já sabe pra onde ir, e **na jornada esse destino são
+  DOIS** (`finishBattle` e `finishNeighborhoodGymBattle`, pelo `battleResultContext`). Chamando o
+  finish eu mesmo, isso viraria uma **segunda regra de "pra onde ir no fim da batalha"**, e ela
+  envelheceria no primeiro destino novo. Há trava cobrando que a ação não cite nenhum `finish*`.
+- **⚠️ NÃO HÁ TIMER A CANCELAR, e isso é por construção:** os três laços abrem com
+  `if(game.screen !== '...') return;` e os três `finish*` trocam a tela (conferido um a um) — então
+  o `setTimeout` que já estava marcado chega e sai na primeira linha. Há trava que dispara um laço
+  pendente **depois** do clique e cobra que nada se repita.
+- **⚠️ O PASSO E O ÚLTIMO GOLPE SÃO ZERADOS JUNTOS** — o golpe fantasma de 09/09/2026 por uma porta
+  nova: o `*LastHit` guarda o passo animado do confronto em que o jogador apertou, e a próxima
+  batalha que reusar a tela sem passar por um `'loading'` o pegaria pra desenhar um golpe que
+  ninguém deu. (Os `*CurrentHp` **não** são zerados de propósito: eles são a barra do confronto em
+  curso e a fase `'loading'` os reescreve antes de qualquer leitura.)
+- **⚠️ A REGRA DE ONDE ELE APARECE MORA NUMA TABELA** (`PULAR_ANIMACAO`), nunca escrita em cada
+  tela: as três telas de batalha a leem pelo `botaoAvancarParaOFimHtml`. Escrita em cada uma, a
+  próxima tela de batalha nasceria com a regra errada — a família de defeito do `CLASSE_DO_BANNER`.
+  **Laço novo que não esteja na tabela simplesmente não ganha o botão**, que é o lado seguro de
+  errar.
+- **⚠️ O BOTÃO E A AÇÃO LEEM A MESMA PERGUNTA** (`lacoQuePodePular`). Separados, o botão apareceria
+  onde a ação recusa — ou, pior, o contrário. E **a regra está na FUNÇÃO, não só no botão**: sem
+  isso, quem chamasse a ação pelo console contornaria a emboscada da Rocket. Há trava pros dois.
+- **ELE É DISCRETO DE PROPÓSITO.** É um atalho, e aparece em **toda** batalha — um botão de ação
+  cheio ali empurraria a leitura do confronto pra baixo e viraria a coisa mais chamativa de uma tela
+  que existe pra ser assistida. ⚠️ E ele é **centrado**: o `.btn` da casa é `text-align:left`, e sem
+  o `center` ele nasceria encostado na borda esquerda de uma caixa que não tem mais nada dentro.
+
+**MEDIDO A 320px, no navegador:** o botão mede **296×40px**, fica **16px abaixo** da caixa do quadro
+(fora dela, como foi pedido), **não corta o texto** e **não há rolagem lateral**. Conferido nas
+quatro telas: Torre, treinador e rival **têm**; **Rocket não tem**.
+
+⚠️ **E A PRÉVIA NÃO COBRIA NENHUMA TELA DE BATALHA** — ela ganhou quatro (as três com o botão mais a
+Rocket, que é a exceção). ⚠️ **E a primeira versão delas saiu SEM o botão**, o que parecia defeito do
+jogo e era da prévia: a regra é lida de `game.screen`, e a prévia chamava o `render*` sem setá-lo.
+É o lembrete de sempre — **uma tela de prévia que não monta o estado que a regra lê mede o conjunto
+vazio**.
+
+`tools/test-pos-batalha.js` tranca **23 pontas**, e **os 9 defeitos religados acusam**. A que importa
+mais é a da Rocket (o botão **e** a ação recusando) e a do resultado: os confrontos, o time e a tela
+de destino idênticos depois de avançar.
+
 ## OS SELOS DE STATUS DESCERAM PRA LINHA DO NÚMERO DE HP (28/09/2026)
 
 Pedido assim: *"esses status, em vez de ficar aparecendo do lado direito do nome do pokémon, vamos

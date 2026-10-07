@@ -1672,12 +1672,13 @@ montados em separado, o jogador via 3 golpes na tela e lia 7 linhas — reportad
 **O que está lá:** o **log de batalha** inteiro (a forma da linha, o diário, o que nunca vira linha, o
 selo de crítico, a suavização, o card que abre e fecha), a **cena nova** com os cenários por
 terreno e a chuva, o **nome do golpe durante a luta**, as **pausas** de leitura, os **cinco laços
-de revelação** e o que cada um pinta.
+de revelação** e o que cada um pinta, e o **"Avançar para o fim"** — o botão que pula a animação
+(com a exceção da Rocket, onde o laço SORTEIA a emboscada e pular mudaria o jogo).
 
 **⚠️ E ESTES SÍMBOLOS SÓ SÃO EXPLICADOS LÁ** — um `grep` que caia aqui e não ache nada tem que
 ir pro capítulo, e é essa lista que faz o gatilho valer quando o assunto não é óbvio:
 
-`PRIORIDADE` · `prioridadeNaTroca` · `SPECIAL_TYPES` · `TYPE_CHART` · `withEstagio` · `index.html` · `fighterHtml` · `passosVisiveis` · `crispEdges` · `simulateGymBattle` · `innerHTML` · `MORIBUNDO_TETO_NO_CHEIO` · `TETO_GOLPES` · `terrainBattleSceneStyle` · `doExchange` · `sequenciaDoConfronto` · `fraseDoEspecial` · `encerrarBatalha` · `passosDaAbertura` · `DESENHOS` · `virarMatchup` · `preservePlayerHp` · `currentColor` · `SONO_EM_TROCAS` · `buildAnimatedHitSequence` · `ORCAMENTO_ANIM_ONLINE_MS` · `logDaMinhaVista` · `pausaDaFaixa` · `obsDoGolpe` · `abrirConfronto` · `spriteComStatusHtml` · `selosDoQuadro` · `hp-bar-rodape` · `statusVisuaisDaSequencia` · `CRIT_BASE` · `applyTerrainBuff` · `m.chuva` · `lastCrit` · `moveTeam` · `ehGolpeEspecial` · `passosHtml` · `Math.random`
+`PRIORIDADE` · `prioridadeNaTroca` · `SPECIAL_TYPES` · `TYPE_CHART` · `withEstagio` · `index.html` · `fighterHtml` · `passosVisiveis` · `crispEdges` · `simulateGymBattle` · `innerHTML` · `MORIBUNDO_TETO_NO_CHEIO` · `TETO_GOLPES` · `terrainBattleSceneStyle` · `doExchange` · `sequenciaDoConfronto` · `fraseDoEspecial` · `encerrarBatalha` · `passosDaAbertura` · `DESENHOS` · `virarMatchup` · `preservePlayerHp` · `currentColor` · `SONO_EM_TROCAS` · `buildAnimatedHitSequence` · `ORCAMENTO_ANIM_ONLINE_MS` · `logDaMinhaVista` · `pausaDaFaixa` · `obsDoGolpe` · `abrirConfronto` · `spriteComStatusHtml` · `selosDoQuadro` · `hp-bar-rodape` · `statusVisuaisDaSequencia` · `CRIT_BASE` · `applyTerrainBuff` · `m.chuva` · `lastCrit` · `moveTeam` · `ehGolpeEspecial` · `passosHtml` · `Math.random` · `PULAR_ANIMACAO` · `avancarParaOFimDaBatalha` · `botaoAvancarParaOFimHtml` · `lacoQuePodePular` · `advanceReveal` · `advanceSpecialReveal` · `advanceTrainerReveal` · `ROCKET_SLEEP_CHANCE`
 
 *(4 seções, 118 subseções, 238 KB — saíram daqui em 25/09/2026 porque o CLAUDE.md é lido
 INTEIRO em toda sessão, e ele tinha chegado a 1.360 KB.)*

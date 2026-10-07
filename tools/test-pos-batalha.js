@@ -405,6 +405,152 @@ console.log('=== A TORRE PASSOU A TER LOG DEPOIS DA BATALHA ===');
     ok('  e o zero continua mudo', S.moedasGanhasHtml() === '');
   }
 
+console.log('');
+console.log('=== AVANCAR PARA O FIM (07/10/2026) ===');
+/* Pedido assim: *"No meio da batalha adicione um botao abaixo do quadro de batalha escrito
+   'Avancar para o fim' e assim ja vai automaticamente para o fim da batalha exibindo ja o log da
+   partida"*.
+
+   ⚠️ O QUE ESTAS TRAVAS EXISTEM PRA COBRAR e que ele e APRESENTACAO: a batalha ja esta calculada
+   quando a animacao comeca, entao pular a pintura nao pode mexer em nivel, evolucao, HP nem em
+   quem venceu. E que ele NAO aparece no esconderijo da Rocket, onde a emboscada da Jigglypuff e
+   sorteada DENTRO do laco. */
+
+/* Monta uma batalha de Torre PARADA NO MEIO da animacao, como se o jogador estivesse assistindo. */
+function torreNoMeioDaAnimacao(){
+  const meu = [S.createInstance('charizard',70), S.createInstance('blastoise',70), S.createInstance('venusaur',70)];
+  const npc = [S.createInstance('onix',68), S.createInstance('arcanine',69), S.createInstance('gengar',70)];
+  meu.forEach(p=>{ p.maxHp = S.calcMaxHp(p); p.hp = p.maxHp; });
+  npc.forEach(p=>{ p.maxHp = S.calcMaxHp(p); p.hp = p.maxHp; });
+  const r = S.simulateGymBattle(meu, npc);
+  const g = S.__getGame();
+  g.trainerBattleResult = { matchups:r.matchups, win:r.win };
+  g.towerBattle = { floor:7, npcName:'Yuri', win:r.win, run:{ floor: r.win?8:7, cleared:false } };
+  g.trainerBattleOpponentName = 'Yuri';
+  g.trainerBattlePlayerName = null;
+  g.towerBattlePending = true;
+  g.screen = 'trainerBattling';
+  /* NO MEIO: primeiro confronto, animando, com um golpe ja pintado. */
+  g.trainerRevealIndex = 0;
+  g.trainerRevealPhase = 'animating';
+  g.trainerHitStep = 1;
+  g.trainerLastHit = { side:'player', amount:30 };
+  g.trainerCurrentPlayerHp = 100; g.trainerCurrentEnemyHp = 90;
+  S.__setGame(g);
+  return r;
+}
+
+{
+  const r = torreNoMeioDaAnimacao();
+  ok('o painel tem mais de um confronto (senao nao ha o que PULAR)', r.matchups.length > 1,
+     r.matchups.length + ' confrontos');
+  const html = S.renderTrainerBattling();
+  ok('o botao aparece no meio da batalha', /avancarParaOFimDaBatalha\(\)/.test(html));
+  ok('com o texto pedido, palavra por palavra', /Avançar para o fim/.test(html),
+     (html.match(/btn-avancar-fim[^>]*>[^<]*/)||[''])[0]);
+  /* ⚠️ ABAIXO DO QUADRO: ele vem DEPOIS do .battle-vs e do fechamento do .box, nao dentro deles. */
+  ok('e ele fica ABAIXO do quadro de batalha',
+     html.indexOf('battle-vs') < html.indexOf('btn-avancar-fim') &&
+     html.lastIndexOf('</div>') < html.indexOf('btn-avancar-fim'),
+     'quadro em ' + html.indexOf('battle-vs') + ', botao em ' + html.indexOf('btn-avancar-fim'));
+
+  /* ⚠️ A TRAVA QUE IMPORTA: o resultado nao muda. */
+  const g = S.__getGame();
+  const antesVenceu = g.trainerBattleResult.win;
+  const antesMatchups = JSON.stringify(g.trainerBattleResult.matchups);
+  const antesTime = JSON.stringify((g.team||[]).map(p=>[p.speciesId,p.level,p.hp]));
+  S.avancarParaOFimDaBatalha();
+  const d = jogo();
+  ok('avancar leva DIRETO pra tela do log', d.screen === 'towerBattleResult', d.screen);
+  ok('e o resultado da batalha e o MESMO', d.trainerBattleResult.win === antesVenceu);
+  ok('e os confrontos sao os MESMOS, byte a byte',
+     JSON.stringify(d.trainerBattleResult.matchups) === antesMatchups);
+  ok('e o time nao foi tocado', JSON.stringify((d.team||[]).map(p=>[p.speciesId,p.level,p.hp])) === antesTime);
+  /* ⚠️ O GOLPE FANTASMA: o passo e o ultimo golpe sao zerados juntos -- senao a proxima batalha
+     que reusar a tela sem passar por um 'loading' desenharia um golpe que ninguem deu. */
+  ok('o passo e o ultimo golpe foram zerados juntos',
+     d.trainerHitStep === 0 && d.trainerLastHit === null,
+     'passo ' + d.trainerHitStep + ', ultimo ' + JSON.stringify(d.trainerLastHit));
+  /* E a tela do log mostra a batalha INTEIRA, nao so o confronto em que ele apertou. */
+  const log = S.renderTowerBattleResult();
+  ok('e o log traz TODOS os confrontos, nao so o que estava na tela',
+     (log.match(/matchup-row/g)||[]).length >= r.matchups.length,
+     (log.match(/matchup-row/g)||[]).length + ' linhas para ' + r.matchups.length + ' confrontos');
+}
+
+/* ⚠️ E UM TIMER PENDENTE NAO PODE TERMINAR A BATALHA DE NOVO: os tres lacos abrem com a guarda de
+   TELA, e os tres finish* trocam a tela -- entao o setTimeout que ja estava marcado chega e sai na
+   primeira linha. Esta trava exercita exatamente isso. */
+{
+  torreNoMeioDaAnimacao();
+  S.avancarParaOFimDaBatalha();
+  const antes = jogo().screen;
+  S.advanceTrainerReveal();            // o timer pendente chegando atrasado
+  S.avancarParaOFimDaBatalha();        // e um segundo clique, por garantia
+  ok('o laco pendente nao reabre nem repete nada', jogo().screen === antes, jogo().screen);
+}
+
+/* ⚠️ O ESCONDERIJO DA ROCKET E A EXCECAO, e ela nao e gosto: a emboscada da Jigglypuff e SORTEADA
+   dentro do laco (Math.random, na fase 'loading' de cada confronto). Com o botao ali, pular a
+   animacao pularia o sorteio dos confrontos que ainda nao foram animados -- o jogador ficaria
+   IMUNE a uma mecanica que custa um pokemon. */
+{
+  const meu = [S.createInstance('charizard',70), S.createInstance('blastoise',70)];
+  const npc = [S.createInstance('arbok',68), S.createInstance('jigglypuff',66)];
+  meu.forEach(p=>{ p.maxHp = S.calcMaxHp(p); p.hp = p.maxHp; });
+  npc.forEach(p=>{ p.maxHp = S.calcMaxHp(p); p.hp = p.maxHp; });
+  const r = S.simulateGymBattle(meu, npc);
+  const g = S.__getGame();
+  g.specialBattleResult = { matchups:r.matchups, win:r.win, playerStatus:[] };
+  g.specialBattle = { context:'rocket', meta:{ opponentName:'Rocket' } };
+  g.screen = 'specialBattling';
+  g.specialRevealIndex = 0; g.specialRevealPhase = 'animating';
+  g.specialHitStep = 1; g.specialLastHit = { side:'player', amount:20 };
+  g.specialCurrentPlayerHp = 100; g.specialCurrentEnemyHp = 90;
+  S.__setGame(g);
+  ok('no ESCONDERIJO DA ROCKET o botao nao existe',
+     !/avancarParaOFimDaBatalha\(\)/.test(S.renderSpecialBattling()));
+  /* ⚠️ E A ACAO RECUSA TAMBEM, nao so o botao: sem isso, quem a chamasse pelo console (ou um
+     chamador futuro) contornaria a emboscada -- a regra tem que estar na FUNCAO. */
+  S.avancarParaOFimDaBatalha();
+  ok('e a acao RECUSA, nao so o botao', jogo().screen === 'specialBattling', jogo().screen);
+
+  /* Mas nos OUTROS contextos da mesma tela (rival, Elite, montanha, vigilia) ele vale: ali o laco
+     nao sorteia nada. */
+  const g2 = S.__getGame();
+  g2.specialBattle = { context:'rival', meta:{ opponentName:'Gary' } };
+  S.__setGame(g2);
+  ok('mas no RIVAL, na mesma tela, ele aparece',
+     /avancarParaOFimDaBatalha\(\)/.test(S.renderSpecialBattling()));
+}
+
+/* ⚠️ A REGRA DE ONDE ELE APARECE MORA NUMA TABELA, nao escrita em cada tela -- senao a proxima
+   tela de batalha nasce com a regra errada (a familia do CLASSE_DO_BANNER). E as TRES telas a leem
+   pela MESMA funcao. */
+{
+  const CLI = require('fs').readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
+  const corpoDe = (nome)=>{ const i = CLI.indexOf('function ' + nome + '('); return i < 0 ? '' : CLI.slice(i, CLI.indexOf('\n}', i)); };
+  ['renderBattling','renderSpecialBattling','renderTrainerBattling'].forEach(n=>{
+    ok('  ' + n + ' chama o botao pela funcao comum', /botaoAvancarParaOFimHtml\(\)/.test(corpoDe(n)));
+    ok('  ' + n + ' nao escreve a regra por conta propria',
+       !/avancarParaOFimDaBatalha\(\)/.test(corpoDe(n)));
+  });
+  /* ⚠️ E O BOTAO E A ACAO LEEM A MESMA PERGUNTA: separados, o botao apareceria onde a acao recusa
+     -- ou, pior, o contrario. */
+  ok('o botao e a acao leem a MESMA pergunta',
+     /lacoQuePodePular\(\)/.test(corpoDe('botaoAvancarParaOFimHtml')) &&
+     /lacoQuePodePular\(\)/.test(corpoDe('avancarParaOFimDaBatalha')));
+  /* ⚠️ E ELE NAO CHAMA O finish* DIRETO: ele pula o laco pro fim e deixa o PROPRIO laco terminar.
+     Chamando o finish, a decisao de "pra onde ir no fim" viraria uma segunda regra -- e na jornada
+     esse destino sao DOIS (finishBattle e finishNeighborhoodGymBattle, pelo battleResultContext). */
+  const acao = corpoDe('avancarParaOFimDaBatalha');
+  ok('a acao NAO chama o finish* direto (o laco e quem decide o destino)',
+     !/finishBattle\(|finishTrainerBattle\(|finishSpecialBattle\(|finishNeighborhoodGymBattle\(/.test(acao));
+  /* ⚠️ E A CLASSE DO BOTAO TEM CSS: a trava do test-pescaria pegou isso na primeira rodada, e ela
+     existe porque classe sem regra nao faz nada EM SILENCIO. */
+  ok('e a classe do botao tem CSS', /\.btn-avancar-fim\{/.test(CLI));
+}
+
   console.log('');
   console.log(falhas ? falhas + ' FALHA(S).' : 'Tudo certo.');
   process.exit(falhas ? 1 : 0);

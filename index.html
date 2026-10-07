@@ -3533,6 +3533,18 @@
   @keyframes streakPulse{0%,100%{transform:scale(1);} 50%{transform:scale(1.1);}}
   .player-link:hover{opacity:.7;}
   .btn.secondary.league-watch-btn{margin-top:8px;padding:8px 10px;font-size:.7rem;}
+  /* O "Avançar para o fim", logo abaixo do quadro de batalha.
+     ⚠️ ELE É DISCRETO DE PROPÓSITO: é um ATALHO, e nesta tela não há ação nenhuma competindo com
+     ele -- mas ele aparece em TODA batalha, e um botão de ação cheio ali empurraria a leitura do
+     confronto pra baixo e viraria a coisa mais chamativa de uma tela que existe pra ser assistida.
+     Ele fica CENTRADO porque não é uma escolha numa lista: é uma saída, e as da casa (a do modal,
+     o Fechar) são centradas também.
+     ⚠️ E O .btn DA CASA É text-align:left -- sem o center aqui ele nasceria encostado na
+     borda esquerda de uma caixa que não tem mais nada dentro. */
+  .btn-avancar-fim{
+    margin:6px 0 0; padding:9px 12px; font-size:.78rem; text-align:center;
+    box-shadow:3px 3px 0 var(--box-border);
+  }
 
   .reset-link{
     display:block;text-align:center;color:#8a8fae;
@@ -16888,6 +16900,83 @@ function finishTrainerBattle(){
   render();
 }
 
+/* =====================================================================
+   AVANÇAR PARA O FIM (07/10/2026)
+   ---------------------------------------------------------------------
+   Pedido assim: *"No meio da batalha adicione um botão abaixo do quadro de batalha escrito
+   'Avançar para o fim' e assim ja vai automaticamente para o fim da batalha exibindo ja o log da
+   partida"*.
+
+   ⚠️ ELE NÃO MUDA UMA LINHA DO RESULTADO, e é isso que o torna seguro: **a batalha inteira já
+   está calculada quando a animação começa**. O motor roda no servidor (Torre, Ginásio da Cidade)
+   ou de uma vez no cliente (jornada, Elite, rival), e o que a tela faz depois é PINTAR os
+   matchups que já vieram prontos. Pular a pintura não pula nada do jogo.
+
+   ⚠️ E ISSO FOI VARRIDO, não suposto: os três laços de revelação foram lidos atrás de qualquer
+   decisão de mecânica (`Math.random`, nível, sketch, save, Pokédex, moeda). **Dois não têm
+   NENHUMA -- eles só pintam.** O terceiro tem UMA, e ela é a razão da exceção abaixo.
+
+   ⚠️ A EXCEÇÃO É O ESCONDERIJO DA ROCKET: a emboscada da Jigglypuff é **sorteada dentro do laço**,
+   na fase 'loading' de cada confronto (`Math.random() < ROCKET_SLEEP_CHANCE`, só quando o contexto
+   é 'rocket'). Pular a animação ali pularia o sorteio dos confrontos que ainda não foram animados
+   -- ou seja, **o botão tornaria o jogador imune a uma mecânica que custa um pokémon**. Então no
+   esconderijo ele não existe. Os outros contextos da mesma tela (rival, Elite, montanha, vigília)
+   não sorteiam nada e ficam.
+
+   ⚠️ E A REGRA DE ONDE ELE APARECE MORA NESTA TABELA, nunca escrita em cada tela: as três telas de
+   batalha a leem pelo `botaoAvancarParaOFimHtml`. Escrita em cada uma, a próxima tela de batalha
+   nasceria com a regra errada -- a família de defeito do `CLASSE_DO_BANNER`. Laço NOVO que não
+   esteja aqui simplesmente não ganha o botão, que é o lado seguro de errar.
+   ===================================================================== */
+const PULAR_ANIMACAO = {
+  battling: { idx:'revealIndex', fase:'revealPhase', res:'battleResult',
+              passo:'revealHitStep', ultimo:'revealLastHit', avanca:()=>advanceReveal() },
+  trainerBattling: { idx:'trainerRevealIndex', fase:'trainerRevealPhase', res:'trainerBattleResult',
+              passo:'trainerHitStep', ultimo:'trainerLastHit', avanca:()=>advanceTrainerReveal() },
+  specialBattling: { idx:'specialRevealIndex', fase:'specialRevealPhase', res:'specialBattleResult',
+              passo:'specialHitStep', ultimo:'specialLastHit', avanca:()=>advanceSpecialReveal(),
+              /* a emboscada da Rocket é sorteada DENTRO do laço -- ver a nota acima */
+              vale:()=> !(game.specialBattle && game.specialBattle.context === 'rocket') }
+};
+/* Em que laço a tela atual está, ou null. Uma pergunta só, lida pelo botão E pela ação: separadas,
+   o botão apareceria onde a ação recusa (ou pior, o contrário). */
+function lacoQuePodePular(){
+  const cfg = PULAR_ANIMACAO[game.screen];
+  if(!cfg || (cfg.vale && !cfg.vale())) return null;
+  const r = game[cfg.res];
+  if(!r || !r.matchups || !r.matchups.length) return null;
+  return cfg;
+}
+/* O botão fica ABAIXO do quadro de batalha, como foi pedido -- logo depois do `.box` que tem a
+   cena e a linha de status, e antes do rodapé de busca online. */
+function botaoAvancarParaOFimHtml(){
+  if(!lacoQuePodePular()) return '';
+  return `<button class="btn secondary btn-avancar-fim" onclick="avancarParaOFimDaBatalha()">⏭️ Avançar para o fim</button>`;
+}
+/* ⚠️ ELE NÃO CHAMA O `finish*` DIRETO, e isso é a decisão estrutural daqui: ele PULA o laço pro
+   último confronto e deixa **o próprio laço** terminar. O ramo final de cada um já sabe pra onde
+   ir -- e na jornada esse destino são DOIS (`finishBattle` e `finishNeighborhoodGymBattle`, pelo
+   `battleResultContext`). Chamando o finish eu mesmo, isso viraria uma SEGUNDA regra de "pra onde
+   ir no fim da batalha", e ela envelheceria no primeiro destino novo.
+
+   ⚠️ E OS TIMERS PENDENTES MORREM SOZINHOS: os três laços abrem com `if(game.screen !== '...') return;`
+   e os três `finish*` trocam a tela (conferido) -- então o `setTimeout` que já estava marcado chega
+   e sai na primeira linha. É por isso que não há timer a cancelar aqui.
+
+   ⚠️ O PASSO E O ÚLTIMO GOLPE SÃO ZERADOS JUNTOS -- o golpe fantasma de 09/09/2026 por uma porta
+   nova: o `*LastHit` guarda o passo animado do confronto em que o jogador apertou o botão, e a
+   próxima batalha que REUSAR a tela sem passar por um 'loading' o pegaria pra desenhar um golpe
+   que ninguém deu. */
+function avancarParaOFimDaBatalha(){
+  const cfg = lacoQuePodePular();
+  if(!cfg) return;
+  game[cfg.idx] = game[cfg.res].matchups.length - 1;
+  game[cfg.fase] = 'result';
+  game[cfg.passo] = 0;
+  game[cfg.ultimo] = null;
+  cfg.avanca();
+}
+
 /* ---------------------------------------------------
    LIGA POKÉMON (nova estrutura multi-documento)
 --------------------------------------------------- */
@@ -23528,6 +23617,7 @@ function renderSpecialBattling(){
           : `<p class="battle-result-line">${matchupResultLine(m)}!${suddenDeathNote(m)}</p>`))
     }</div>
   </div>
+  ${botaoAvancarParaOFimHtml()}
   ${botaoBuscaOnlineHtml()}`;
 }
 function renderSpecialResult(){
@@ -24192,7 +24282,8 @@ function renderTrainerBattling(){
         ? statusDoConfrontoHtml(m, game.trainerHitStep, game.trainerLastHit)
         : `<p class="battle-result-line">${matchupResultLine(m)}!${suddenDeathNote(m)}</p>`)
     }</div>
-  </div>`;
+  </div>
+  ${botaoAvancarParaOFimHtml()}`;
 }
 
 /* O RESULTADO DE UM ANDAR DA TORRE. Mesma leitura das outras telas de resultado -- log, seu time,
@@ -28997,6 +29088,7 @@ function renderBattling(){
     }</div>
   </div>
   </div>
+  ${botaoAvancarParaOFimHtml()}
   ${botaoBuscaOnlineHtml()}`;
 }
 

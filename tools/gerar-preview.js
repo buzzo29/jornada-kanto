@@ -410,6 +410,58 @@ game.myLeagueHistory = [];
 game.leagueLeaderboard = [];
 game.leagueData = null;
 game.currentLeagueTypeId = null;
+
+/* ---- as telas de BATALHA, no meio da animacao ---- */
+/* ⚠️ ELAS NAO TINHAM TELA AQUI, e o "Avancar para o fim" (07/10/2026) precisou: o botao fica
+   ABAIXO do quadro e aparece em TODA batalha -- e e justamente a 320px que da pra ver se ele
+   empurra a leitura do confronto ou compete com ela. */
+{
+  const meu = sb.createInstance('charizard', 70), ini = sb.createInstance('onix', 68);
+  [meu, ini].forEach(p=>{ p.maxHp = sb.calcMaxHp(p); p.hp = p.maxHp; });
+  const r = sb.simulateGymBattle([meu, sb.createInstance('blastoise',70), sb.createInstance('venusaur',70)],
+                                 [ini, sb.createInstance('arcanine',69), sb.createInstance('gengar',70)]);
+  /* NO MEIO: primeiro confronto, animando, com um golpe ja pintado -- e o estado em que o jogador
+     esta quando o botao interessa. */
+  /* ⚠️ O `game.screen` TEM QUE SER SETADO AQUI, e isso nao e detalhe de arrumacao: a regra de
+     onde o "Avancar para o fim" aparece e lida DA TELA (`PULAR_ANIMACAO[game.screen]`). Sem isso
+     as quatro telas abaixo saiam SEM o botao -- e a primeira medicao delas reportou exatamente
+     isso, um "0 botoes em 9 telas de batalha" que parecia defeito do jogo e era da previa.
+     As outras telas daqui nao precisam porque nenhuma delas pergunta em que tela esta. */
+  const noMeio = ()=>{
+    game.screen = 'trainerBattling';
+    game.trainerRevealIndex = 0; game.trainerRevealPhase = 'animating';
+    game.trainerHitStep = 1; game.trainerLastHit = { side:'player', amount:40 };
+    game.trainerCurrentPlayerHp = Math.round(r.matchups[0].playerMaxHp * 0.62);
+    game.trainerCurrentEnemyHp  = Math.round(r.matchups[0].enemyMaxHp  * 0.41);
+  };
+  game.trainerBattleResult = { matchups: r.matchups, win: r.win };
+  game.trainerBattleOpponentName = 'Faixa Preta'; game.trainerBattlePlayerName = null;
+  game.towerBattlePending = true; game.bossBattlePending = false; game.selecaoBattlePending = false;
+  noMeio();
+  add('Batalha', 'TORRE — no meio, com o "Avancar para o fim"', ()=>sb.renderTrainerBattling());
+
+  /* A mesma tela SEM a marca da Torre: o desafio por codigo, que nao tem cenario. */
+  game.towerBattlePending = false;
+  noMeio();
+  add('Batalha', 'TREINADOR — a mesma tela, sem cenario', ()=>sb.renderTrainerBattling());
+  game.towerBattlePending = true;
+
+  /* ⚠️ O ESCONDERIJO DA ROCKET E A EXCECAO: ali a emboscada da Jigglypuff e SORTEADA dentro do
+     laco, entao o botao NAO pode aparecer. Vale ver as duas lado a lado. */
+  game.screen = 'specialBattling';
+  game.specialBattleResult = { matchups: r.matchups, win: r.win, playerStatus: [] };
+  game.specialRevealIndex = 0; game.specialRevealPhase = 'animating';
+  game.specialHitStep = 1; game.specialLastHit = { side:'player', amount:40 };
+  game.specialCurrentPlayerHp = Math.round(r.matchups[0].playerMaxHp * 0.62);
+  game.specialCurrentEnemyHp  = Math.round(r.matchups[0].enemyMaxHp  * 0.41);
+  game.specialBattle = { context:'rival', meta:{ opponentName:'Gary' } };
+  add('Batalha', 'RIVAL — tem o botao', ()=>sb.renderSpecialBattling());
+  game.specialBattle = { context:'rocket', meta:{ opponentName:'Equipe Rocket' } };
+  add('Batalha', 'ROCKET — NAO tem (a emboscada e sorteada no laco)', ()=>sb.renderSpecialBattling());
+
+  game.specialBattle = null; game.specialBattleResult = null;
+  game.trainerBattleResult = null; game.towerBattlePending = false;
+}
 game.screen = 'saveSelect';
 
 /* ---- a página ---- */
