@@ -1262,7 +1262,9 @@ Base criada em 09/09/2026 e **trocada de geração no mesmo dia**: nasceu na Gen
 **LEIA ESSE ARQUIVO ANTES DE MEXER EM DANO, GOLPE, STATUS, PASSIVA OU NO LOG DE BATALHA.** Ele é o
 registro de 39 mecânicas medidas — e cada uma delas custou uma medição, um relato ou os dois.
 
-O que está lá: os **golpes escolhidos** pelo jogador (o par vale **79 pontos** de taxa de vitória),
+O que está lá: os **golpes escolhidos** pelo jogador (o par vale **79 pontos** de taxa de vitória)
+e o **golpe trocado que se perdia** quando o Doce Raro era a porta (`gravarSeODestinoNaoGrava`,
+`SCREENS_DE_VOLTA`, `podeGravarNaTela`, `SAFE_SAVE_SCREENS`, `evolucaoDepois`, `escolhaDepois`),
 os **cinco status por ataque** (congelamento, queimadura, veneno, paralisia, confusão), os
 **estágios de atributo**, o **Metrônomo**, a **Fúria** e a **Fúria do Dragão**, o **Remoinho**, as
 duas **danças**, a **Dança da Chuva**, o **Sketch**, a **herança de aprendizado da linha**, a

@@ -1228,6 +1228,99 @@ S1.useRareCandyOn('0', 'mon9').then(() => {
   const chamadas = (src.match(/if\(aprendizadoDoSavePendente\(\)\) return;/g) || []).length;
   ok('e os DOIS caminhos de abrir save perguntam', chamadas >= 2, chamadas + ' chamadas');
 
+  /* ============================================================================
+     O GOLPE TROCADO TEM QUE SER GRAVADO (08/10/2026)
+     ----------------------------------------------------------------------------
+     Reportado assim: *"nao to conseguindo trocar a skill de um pokemon, eu taquei uns rare candy,
+     mas na hora de aprender uma skill nova, quando eu troco abre a torre"*.
+
+     ⚠️ A TROCA ACONTECIA; o que nao acontecia era a GRAVACAO. Nao ha salvamento explicito neste
+     caminho -- ele depende do autosave, e o autosave so roda nas SAFE_SAVE_SCREENS. Das OITO telas
+     pra onde o aprendizado devolve o jogador, TRES estao de fora -- e as tres sao exatamente de
+     onde o Doce Raro e usado: a MOCHILA (ele e um item), a TORRE (ela tem o botao "Usar") e a HOME.
+
+     ⚠️ E O NIVEL VOLTAVA, O GOLPE NAO: o doce sobe o nivel no SERVIDOR (que grava) e a troca e so
+     do cliente. O save voltava com o nivel NOVO e os golpes VELHOS, a janela continuava aberta, e
+     A MESMA PERGUNTA REAPARECIA -- que e o "nao to conseguindo trocar".
+     ============================================================================ */
+  console.log('\nO GOLPE TROCADO TEM QUE SER GRAVADO (o relato do Doce Raro)');
+  {
+    const pika = ()=>{ const p = S.createInstance('pikachu', 26); p.id = 'mon1';
+      p.ataques = ['slam','quickattack','thundershock'];
+      p.nivelDosAtaques = 20; p.especieDosAtaques = 'pikachu'; return p; };
+    /* As TRES telas de onde o doce e usado, mais o controle da jornada. */
+    const casos = [
+      ['a MOCHILA (o doce e um item)', 'inventario', true],
+      ['a TORRE (ela tem o botao Usar)', 'trainerTower', true],
+      ['a HOME (o save acabou de abrir)', 'saveSelect', true],
+      ['controle: no meio da jornada', 'walk', false]
+    ];
+    for(const [nome, tela, precisaGravarSozinho] of casos){
+      S.__escritas.length = 0;
+      const d = S.__getGame();
+      d.team = [pika()]; d.currentSaveSlot = 0; d.screen = tela; d.authUser = { uid:'yoshe' };
+      d.evolucaoDepois = null; d.aprenderAtaque = null; d.golpesAprendidos = []; d.evolutions = [];
+      d.ilhasJornada = null; d.ilhasResultado = null;
+      S.__setGame(d);
+      S.aprendizadoDoSavePendente();
+      const antes = S.__getGame().team[0].ataques.slice();
+      ok('  ' + nome + ': a tela de troca abriu', S.__getGame().screen === 'aprenderAtaque',
+         S.__getGame().screen);
+      S.responderAprendizado(antes[0]);
+      /* ⚠️ SEM await aqui: o saveCurrentGame e async, mas a chamada do .set() acontece ANTES do
+         primeiro await dele -- entao a escrita ja esta anotada quando o controle volta. */
+      const naMemoria = S.__getGame().team[0].ataques;
+      ok('  ' + nome + ': a troca aconteceu na memoria', naMemoria[0] !== antes[0],
+         JSON.stringify(antes) + ' -> ' + JSON.stringify(naMemoria));
+      const doSave = S.__escritas.filter(e => e.dados && Array.isArray(e.dados.team));
+      /* ⚠️ A TRAVA QUE IMPORTA: a tela de destino nao grava sozinha, entao a gravacao TEM que sair
+         daqui. Sem ela o jogador troca, sai, volta, e o golpe velho esta la. */
+      if(precisaGravarSozinho){
+        ok('  ' + nome + ': e foi GRAVADA (a tela de destino nao grava sozinha)',
+           doSave.length >= 1 && doSave[doSave.length-1].dados.team[0].ataques[0] === naMemoria[0],
+           doSave.length + ' escrita(s)');
+        /* ⚠️ E O DESTINO LIMPO VAI JUNTO: o evolucaoDepois e gravado com a tela de aprendizado (ela
+           E ponto de gravacao), e quem o limpa e o continueFromEvolution. Sem a gravacao, essa
+           limpeza nunca chegava ao banco -- o save ficava com 'trainerTower' pendurado, e na
+           proxima passada o `if(!game.evolucaoDepois)` NAO sobrescrevia: o destino velho ROUBAVA a
+           ida nova, e o jogador caia na Torre sem ter ido la. E a segunda metade do relato. */
+        ok('  ' + nome + ': e o destino ficou LIMPO no save (nao rouba a proxima passada)',
+           doSave.length >= 1 && !doSave[doSave.length-1].dados.evolucaoDepois,
+           JSON.stringify(doSave.length ? doSave[doSave.length-1].dados.evolucaoDepois : '(nada gravado)'));
+      } else {
+        /* ⚠️ E NAO GRAVA ONDE O AUTOSAVE JA GRAVA: seria uma ida ao servidor a mais por troca, em
+           todo golpe aprendido na jornada -- que e onde eles quase sempre acontecem. */
+        ok('  ' + nome + ': NAO grava de novo (o autosave ja cobre esta tela)', doSave.length === 0,
+           doSave.length + ' escrita(s)');
+      }
+    }
+    /* ⚠️ E A OUTRA FILA TEM QUE TER A MESMA GRAVACAO. Sao duas -- a de ESCOLHA (save antigo, quem
+       nao tem golpe nenhum) e a de APRENDIZADO (quem cruzou um nivel) --, e as duas chegam nas
+       MESMAS tres telas. Consertar uma so deixaria a outra com o buraco. */
+    const CLI = fs.readFileSync(path.join(RAIZ, 'index.html'), 'utf8');
+    const corpoDe = (n)=>{ const i = CLI.indexOf('function ' + n + '('); return i < 0 ? '' : CLI.slice(i, CLI.indexOf('\n}', i)); };
+    ok('a fila do APRENDIZADO grava', /gravarSeODestinoNaoGrava\(\)/.test(corpoDe('continueFromEvolution')));
+    ok('e a fila da ESCOLHA tambem', /gravarSeODestinoNaoGrava\(\)/.test(corpoDe('seguirDaEscolhaDeAtaques')));
+    /* ⚠️ E A PERGUNTA DE "preciso gravar?" E UMA SO, lida da TELA: escrita a mao em cada ponto, a
+       proxima tela que entrar na SCREENS_DE_VOLTA nasce com o buraco de volta -- em silencio,
+       porque o golpe troca na tela e so some depois. */
+    ok('e as duas perguntam pela MESMA funcao, que le a tela',
+       /podeGravarNaTela\(\)/.test(corpoDe('gravarSeODestinoNaoGrava')));
+    /* ⚠️ E A LISTA DE DESTINOS TEM QUE CONTER AS TRES TELAS QUE NAO GRAVAM -- e esta trava existe
+       pra o dia em que alguem acrescentar uma quarta: ela cobra que TODA tela da SCREENS_DE_VOLTA
+       ou grava sozinha, ou esta coberta pela gravacao explicita. Hoje isso e sempre verdade porque
+       a gravacao pergunta pela tela; a trava cai se alguem trocar a pergunta por uma lista a mao. */
+    const destinos = [...(S.SCREENS_DE_VOLTA || [])];
+    ok('a lista de destinos do aprendizado foi lida', destinos.length >= 8, destinos.length + ' telas');
+    const semGravacao = destinos.filter(t => {
+      const d = S.__getGame(); d.screen = t; d.ilhasJornada = null; d.ilhasResultado = null; S.__setGame(d);
+      return !S.podeGravarNaTela();
+    });
+    ok('  e as que NAO gravam sozinhas sao conhecidas (hoje: mochila, torre, home)',
+       semGravacao.length === 3 && ['inventario','trainerTower','saveSelect'].every(t=>semGravacao.includes(t)),
+       semGravacao.join(', '));
+  }
+
   console.log(falhas ? '\n' + falhas + ' FALHA(S).' : '\nTudo certo.');
   process.exit(falhas ? 1 : 0);
 }).catch(e => { console.error(e); process.exit(1); });

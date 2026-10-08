@@ -10,6 +10,94 @@
 
 ---
 
+## O GOLPE TROCADO SE PERDIA QUANDO O DOCE RARO ERA A PORTA (08/10/2026)
+
+Reportado por um jogador (Yoshe): *"nao to conseguindo trocar a skill de um pokemon, eu taquei uns
+rare candy, mas na hora de aprender uma skill nova, quando eu troco abre a torre(?????)"*.
+
+**As duas metades do relato são o MESMO defeito**, e ele é de gravação, não de golpe.
+
+### ⚠️ A TROCA ACONTECIA — O QUE NÃO ACONTECIA ERA A GRAVAÇÃO
+
+Não há salvamento explícito neste caminho: ele depende do **autosave**, e o autosave só roda nas
+`SAFE_SAVE_SCREENS`. Das **oito** telas pra onde o aprendizado devolve o jogador
+(`SCREENS_DE_VOLTA`), **TRÊS estão de fora** — e as três são exatamente de onde o Doce Raro é usado:
+
+| destino | o autosave grava? |
+|---|---|
+| `walk`, `walkNext`, `gymChoice`, `teamOrder`, `journeyEnd` | sim |
+| **`inventario`** — a mochila, onde o doce é um item | **NÃO** |
+| **`trainerTower`** — a Torre, que tem o botão "Usar" do doce | **NÃO** |
+| **`saveSelect`** — a home, de onde o save é aberto | **NÃO** |
+
+### ⚠️ E O NÍVEL VOLTAVA, O GOLPE NÃO — é isso que fazia parecer "não dá pra trocar"
+
+O Doce Raro sobe o nível **no SERVIDOR** (que grava, e grava a evolução junto pelo
+`evoluirNoSave`); a troca de golpe é **só do cliente**. Então o save voltava com o **nível NOVO** e
+os **golpes VELHOS** — a janela `(nivelDosAtaques, level]` continuava aberta, e **a mesma pergunta
+reaparecia**.
+
+**Medido ponta a ponta**, com um Pikachu Lv.26 cujos golpes foram escolhidos no 20:
+
+```
+na memoria depois da troca : ["thunderbolt","quickattack","thundershock"]
+o autosave grava na tela   : NAO
+depois de sair e voltar    : ["slam","quickattack","thundershock"]
+a pergunta VOLTA?          : SIM -- ["thunderbolt"]
+```
+
+### ⚠️ E A TORRE APARECENDO "DO NADA" É CONSEQUÊNCIA DA MESMA FALTA
+
+O `evolucaoDepois` é gravado junto com a tela de aprendizado (ela **é** ponto de gravação), e quem
+o **limpa** é o `continueFromEvolution`. Sem a gravação no destino, **essa limpeza nunca chegava ao
+banco**: o save ficava com `'trainerTower'` pendurado.
+
+E aí o `aprendizadoDoSavePendente` tem a guarda `if(!game.evolucaoDepois)` — ela existe pro F5 no
+meio do fluxo, e **não sobrescreve um destino já gravado**. Então o destino velho **roubava a
+passada nova**: o jogador usava o doce na mochila, trocava o golpe, e caía na Torre **sem ter ido
+lá**. Reproduzido nos dois caminhos.
+
+⚠️ **É A MESMA FAMÍLIA QUE O `escolhaDepois` JÁ PAGOU** — o próprio comentário do código a nomeia:
+*"o destino não é nosso, e deixá-lo gravado ROUBA a próxima passada"*. Ali ela foi fechada pro ramo
+que **não abre tela**; este é o ramo que **abre** e não grava o fim.
+
+### O CONSERTO
+
+`gravarSeODestinoNaoGrava()` — grava quando a tela de destino não grava sozinha:
+
+- **⚠️ ELE VALE PRAS DUAS FILAS, numa função só:** a de **ESCOLHA** (save antigo, quem não tem golpe
+  nenhum — `seguirDaEscolhaDeAtaques`) e a de **APRENDIZADO** (quem cruzou um nível —
+  `continueFromEvolution`). As duas chegam nas **mesmas três telas**; consertar uma deixaria a
+  outra com o buraco.
+- **⚠️ E A PERGUNTA É PELA TELA (`podeGravarNaTela`), nunca uma lista à mão:** escrita como
+  `if(screen === 'inventario')`, a próxima tela que entrar na `SCREENS_DE_VOLTA` nasce com o buraco
+  de volta — **em silêncio**, porque o golpe troca na tela e só some depois. Há trava pros dois
+  sentidos.
+- **⚠️ E ELE NÃO GRAVA ONDE O AUTOSAVE JÁ GRAVA:** seria uma ida ao servidor a mais por troca, em
+  todo golpe aprendido **na jornada** — que é onde eles quase sempre acontecem. Medido: zero
+  escritas no caminho `walk`, uma nas três telas problemáticas.
+- O `saveCurrentGame` já recusa sozinho sem save aberto (`currentSaveSlot == null`), então não houve
+  guarda nova a inventar.
+
+**NO MOTOR, NADA:** `MOTOR 50f98ed8f55a / DIARIO afe5f784d838`, idêntico — é gravação inteira.
+
+`tools/test-ataques.js` tranca 20 pontas: as três telas gravando (com o golpe certo **e** o destino
+limpo), a jornada **não** gravando de novo, as duas filas chamando a mesma função, a pergunta sendo
+pela tela, e a varredura que nomeia quais destinos não gravam sozinhos — é ela que acusa no dia em
+que uma quarta tela entrar na lista. **Conferido: os 4 defeitos religados acusam.**
+
+### ⚠️ O QUE FICA EM ABERTO, E É DECISÃO
+
+**Usar o doce NA TORRE continua devolvendo o jogador pra Torre**, e isso é o desenho (`'trainerTower'`
+está na `SCREENS_DE_VOLTA` de propósito: *"mandá-lo pro teamOrder tiraria ele do lugar por ter
+aprendido um golpe"*). Com a troca agora **persistindo**, a confusão do relato deve sumir — ele vê o
+golpe trocado. Se ainda incomodar, a régua é tirar `trainerTower` daquela lista.
+
+**E `openSaveSelect` NÃO fecha o save** (não limpa `currentSaveSlot` nem `team`), o que é o que
+permite usar o doce na Torre sobre o pokémon do save que estava aberto. Não foi mexido — mexer ali
+alcança muito mais que este relato —, mas fica registrado: é por isso que a Torre consegue ser a
+tela de origem de um aprendizado.
+
 ## Os golpes do pokémon (escolhidos pelo jogador) — hoje são TRÊS
 
 Cada pokémon leva **até TRÊS golpes** (`MAX_GOLPES`), escolhidos na captura e trocados quando o nível traz um

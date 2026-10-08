@@ -14015,10 +14015,41 @@ function marcarAtaque(golpe){
    níveis (é o funil que abriu a fila); ao ABRIR UM SAVE ANTIGO é a tela em que o save estava.
    É uma CHAVE no save e não uma função, pelo mesmo motivo do evolucaoDepois e do releaseDepois: a
    tela de escolha é ponto seguro de gravação, e função não sobrevive ao save. */
+/* ⚠️ O GOLPE ESCOLHIDO SE PERDIA QUANDO O DESTINO NÃO ERA UMA TELA DE GRAVAÇÃO (08/10/2026).
+   Reportado assim: *"nao to conseguindo trocar a skill de um pokemon, eu taquei uns rare candy,
+   mas na hora de aprender uma skill nova, quando eu troco abre a torre"*.
+
+   ⚠️ E A TROCA ACONTECIA -- o que não acontecia era a GRAVAÇÃO. O jogo não tem salvamento
+   explícito aqui: ele depende do autosave, e o autosave **só roda nas `SAFE_SAVE_SCREENS`**.
+   Das oito telas pra onde estas duas filas podem devolver o jogador, **TRÊS estão de fora** --
+   e as três são exatamente de onde o Doce Raro é usado:
+
+   | destino | o autosave grava? |
+   |---|---|
+   | `walk`, `walkNext`, `gymChoice`, `teamOrder`, `journeyEnd` | sim |
+   | **`inventario`** (a mochila, onde o doce é um item) | **NÃO** |
+   | **`trainerTower`** (a Torre, que tem o botão "Usar" do doce) | **NÃO** |
+   | **`saveSelect`** (a home, de onde o save é aberto) | **NÃO** |
+
+   ⚠️ E O NÍVEL VOLTAVA, O GOLPE NÃO -- é isso que fazia o defeito parecer "não dá pra trocar": o
+   Doce Raro sobe o nível **no SERVIDOR** (que grava), e a troca de golpe é **só do cliente**. O
+   save voltava com o nível NOVO e os golpes VELHOS, a janela `(nivelDosAtaques, level]` continuava
+   aberta, e **a mesma pergunta reaparecia**. Medido ponta a ponta: o jogador troca, sai, volta, e
+   a pergunta está lá de novo com o golpe intacto.
+
+   ⚠️ A GRAVAÇÃO VALE PRAS DUAS FILAS, e numa função só: a de ESCOLHA (save antigo, quem não tem
+   golpe nenhum) e a de APRENDIZADO (quem cruzou um nível). Consertar uma só deixaria a outra com
+   o mesmo buraco -- e elas chegam nas MESMAS três telas. */
+function gravarSeODestinoNaoGrava(){
+  /* O autosave cobre as telas de jornada; aqui só sobra o que ele não alcança. Gravar nas duas
+     seria uma ida ao servidor a mais por troca, e o `saveCurrentGame` já recusa sozinho quando
+     não há save aberto (`currentSaveSlot == null`). */
+  if(!podeGravarNaTela()) saveCurrentGame();
+}
 function seguirDaEscolhaDeAtaques(){
   const depois = game.escolhaDepois;
   game.escolhaDepois = null;
-  if(depois){ game.screen = depois; render(); return; }
+  if(depois){ game.screen = depois; gravarSeODestinoNaoGrava(); render(); return; }
   startLevelDistribution();
 }
 function confirmarAtaques(){
@@ -14547,7 +14578,13 @@ function continueFromEvolution(){
   /* ⚠️ VINDO DO DOCE RARO ou de abrir o save, o destino é uma TELA e não um passo da jornada --
      o jogador estava na mochila, no resumo da jornada, na torre. Mandá-lo pro teamOrder tiraria
      ele do lugar por ter aprendido um golpe. */
-  if(depois && typeof depois === "string" && SCREENS_DE_VOLTA.has(depois)){ game.screen = depois; render(); return; }
+  if(depois && typeof depois === "string" && SCREENS_DE_VOLTA.has(depois)){
+    game.screen = depois;
+    /* ⚠️ AQUI É O CAMINHO DO DOCE RARO, e é por ele que a troca se perdia: três das oito telas
+       desta lista estão fora do `SAFE_SAVE_SCREENS`. Ver o `gravarSeODestinoNaoGrava`. */
+    gravarSeODestinoNaoGrava();
+    render(); return;
+  }
   game.screen = 'teamOrder';
   render();
 }
